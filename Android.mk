@@ -530,6 +530,16 @@ include $(CLEAR_VARS)
 BUSYBOX_LINKS := $(shell cat external/busybox/busybox-full.links)
 exclude := tune2fs mke2fs mkdosfs mkfs.vfat gzip gunzip
 
+# Having /sbin/modprobe present on 32 bit devices with can cause a massive
+# performance problem if the kernel has CONFIG_MODULES=y
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -gt 22; echo $$?),0)
+    ifneq ($(TARGET_ARCH), arm64)
+        ifneq ($(TARGET_ARCH), x86_64)
+            exclude += modprobe
+        endif
+    endif
+endif
+
 #MultiROM uses restorecon -D which is only available in toolbox
 ifeq ($(TARGET_RECOVERY_IS_MULTIROM), true)
 	ifeq ($(TWHAVE_SELINUX), true)
