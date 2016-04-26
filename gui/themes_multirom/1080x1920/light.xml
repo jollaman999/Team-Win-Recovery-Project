@@ -346,13 +346,21 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row3_2_y%" />
 				<font resource="body2" color="%text%" />
+				<text>Disable free space check before backup</text>
+				<data variable="tw_disable_free_space" />
+				<image checked="checkbox_true" unchecked="checkbox_false" />
+			</object>
+
+			<object type="checkbox">
+				<placement x="%col1_x%" y="%row3_3a_y%" />
+				<font resource="body2" color="%text%" />
 				<text>Skip MD5 generation on backups</text>
 				<data variable="tw_skip_md5_generate" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row3_3a_y%" />
+				<placement x="%col1_x%" y="%row4_2_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Enable MD5 checking of backup files</text>
 				<data variable="tw_skip_md5_check" />
@@ -360,7 +368,7 @@
 			</object>
 
 			<object type="checkbox">
-				<placement x="%col1_x%" y="%row4_2_y%" />
+				<placement x="%col1_x%" y="%row4_3a_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Simulate most actions for theme testing</text>
 				<data variable="tw_simulate_actions" />
@@ -369,7 +377,7 @@
 
 			<object type="checkbox">
 				<condition var1="tw_simulate_actions" var2="1" />
-				<placement x="%col1_x%" y="%row4_3a_y%" />
+				<placement x="%col1_x%" y="%row5_2_y%" />
 				<font resource="body2" color="%text%" />
 				<text>Simulate failure for actions</text>
 				<data variable="tw_simulate_fail" />
@@ -6415,7 +6423,7 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row7_2a_y%" />
 				<font resource="body2" color="%text%" />
-				<text>Disable Free Space Check</text>
+				<text>Disable free space check before backup</text>
 				<data variable="tw_disable_free_space" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
