@@ -82,7 +82,7 @@ struct flag_list {
 	unsigned flag;
 };
 
-const struct flag_list mount_flags[] = {
+static struct flag_list mount_flags[] = {
 	{ "noatime",    MS_NOATIME },
 	{ "noexec",     MS_NOEXEC },
 	{ "nosuid",     MS_NOSUID },
@@ -553,40 +553,36 @@ bool TWPartition::Process_Fstab_Line(string Line, bool Display_Error) {
 	return true;
 }
 
-void TWPartition::Process_FS_Flags(const char *str) {
-	char *options = strdup(str);
-	char *ptr, *savep;
+bool TWPartition::Process_FS_Flags(string& Options, int& Flags) {
+	int i;
+	char *p;
+	char *savep;
+	char fs_options[250];
 
-	Mount_Options = "";
+	strlcpy(fs_options, Options.c_str(), sizeof(fs_options));
+	Options = "";
 
-	// Avoid issues with potentially nested strtok by using strtok_r
-	ptr = strtok_r(options, ",", &savep);
-	while (ptr) {
-		const struct flag_list* mount_flag = mount_flags;
-
-		for (; mount_flag->name; mount_flag++) {
-			// mount_flags are never postfixed by '=',
-			// so only match identical strings (including length)
-			if (strcmp(ptr, mount_flag->name) == 0) {
-				Mount_Flags |= mount_flag->flag;
+	p = strtok_r(fs_options, ",", &savep);
+	while (p) {
+		/* Look for the flag "p" in the flag list "fl"
+		* If not found, the loop exits with fl[i].name being null.
+		*/
+		for (i = 0; mount_flags[i].name; i++) {
+			if (strncmp(p, mount_flags[i].name, strlen(mount_flags[i].name)) == 0) {
+				Flags |= mount_flags[i].flag;
 				break;
 			}
 		}
 
-		if (mount_flag->flag == MS_RDONLY)
-			Mount_Read_Only = true;
-
-		if (mount_flag->name != 0) {
-			if (!Mount_Options.empty())
-				Mount_Options += ",";
-			Mount_Options += mount_flag->name;
-		} else {
-			LOGINFO("Unhandled mount flag: '%s'\n", ptr);
+		if (!mount_flags[i].name) {
+			if (Options.size() > 0)
+				Options += ",";
+			Options += p;
 		}
-
-		ptr = strtok_r(NULL, ",", &savep);
+		p = strtok_r(NULL, ",", &savep);
 	}
-	free(options);
+
+	return true;
 }
 
 void TWPartition::Apply_TW_Flag(const unsigned flag, const char* str, const bool val) {
@@ -623,7 +619,8 @@ void TWPartition::Apply_TW_Flag(const unsigned flag, const char* str, const bool
 			Can_Flash_Img = val;
 			break;
 		case TWFLAG_FSFLAGS:
-			Process_FS_Flags(str);
+			Mount_Options = str;
+			Process_FS_Flags(Mount_Options, Mount_Flags);
 			break;
 		case TWFLAG_IGNOREBLKID:
 			Ignore_Blkid = val;
