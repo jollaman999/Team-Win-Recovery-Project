@@ -183,8 +183,6 @@ const struct flag_list tw_flags[] = {
 
 #ifdef TARGET_RECOVERY_IS_MULTIROM
 TWPartition::TWPartition(const string& fstab_line) {
-	char line[MAX_FSTAB_LINE_LENGTH];
-	int line_len;
 #else
 TWPartition::TWPartition() {
 #endif
@@ -244,11 +242,8 @@ TWPartition::TWPartition() {
 	Is_ImageMount = false;
 	Size_Raw = 0;
 
-	if(!fstab_line.empty()) {
-		line_len = fstab_line.size();
-		strncpy(line, fstab_line.c_str(), line_len);
-		Process_Fstab_Line(line, true);
-	}
+    if(!fstab_line.empty())
+		Process_Fstab_Line(fstab_line, true);
 #endif //TARGET_RECOVERY_IS_MULTIROM
 	Mount_Read_Only = false;
 	Is_Adopted_Storage = false;
