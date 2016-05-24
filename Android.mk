@@ -193,6 +193,10 @@ ifeq ($(TWHAVE_SELINUX), true)
     endif
 endif
 
+ifeq ($(AB_OTA_UPDATER),true)
+    LOCAL_CFLAGS += -DAB_OTA_UPDATER=1
+endif
+
 LOCAL_MODULE_PATH := $(TARGET_RECOVERY_ROOT_OUT)/sbin
 
 ifeq ($(TARGET_USE_MDTP), true)
