@@ -2172,15 +2172,7 @@
 				<image resource="btn_raised_rebootrecovery" />
 				<actions>
 					<action function="set">tw_back=main</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -3867,15 +3859,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -3963,15 +3947,7 @@
 				<image resource="btn_raised_rebootrecovery" />
 				<actions>
 					<action function="set">tw_back=main</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -3982,15 +3958,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4031,6 +3999,34 @@
 				<action function="set">tw_show_reboot=0</action>
 				<action function="page">%tw_clear_destination%</action>
 			</object>
+		</page>
+
+		<page name="reboot_recovery_routine">
+			<actions>
+				<action function="set">tw_action=reboot</action>
+				<action function="set">tw_action_param=recovery</action>
+				<action function="set">tw_has_action2=0</action>
+				<action function="set">tw_text1=No OS Installed!</action>
+				<action function="set">tw_text2=Are you sure you wish to restart?</action>
+				<action function="set">tw_action_text1=Restarting...</action>
+				<action function="set">tw_complete_text1=Restarting...</action>
+				<action function="set">tw_slider_text=Swipe to Restart</action>
+				<action function="page">rebootcheck</action>
+			</actions>
+		</page>
+
+		<page name="reboot_system_routine">
+			<action>
+				<action function="set">tw_action=reboot</action>
+				<action function="set">tw_action_param=system</action>
+				<action function="set">tw_has_action2=0</action>
+				<action function="set">tw_text1=No OS Installed!</action>
+				<action function="set">tw_text2=Are you sure you wish to restart?</action>
+				<action function="set">tw_action_text1=Restarting...</action>
+				<action function="set">tw_complete_text1=Restarting...</action>
+				<action function="set">tw_slider_text=Swipe to Restart</action>
+				<action function="page">rebootcheck</action>
+			</action>
 		</page>
 
 		<page name="confirm_action">
@@ -4347,15 +4343,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4405,15 +4393,7 @@
 				<image resource="mb_system" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4428,15 +4408,7 @@
 				<image resource="mb_system_color" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -4457,15 +4429,7 @@
 				<image resource="mb_recovery" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -4480,15 +4444,7 @@
 				<image resource="mb_recovery_color" />
 				<actions>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -6255,15 +6211,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -6783,15 +6731,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -7693,15 +7633,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -9356,15 +9288,7 @@
 				<image resource="btn_raised_rebootsystem" />
 				<actions>
 					<action function="set">tw_back=main2</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=system</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_system_routine</action>
 				</actions>
 			</object>
 
@@ -11080,17 +11004,9 @@
 					rm -r "/cache/twrp";
 					</action>
 					<action function="set">hl_color=%tw_hl_color%</action>
-					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
 					<action function="overlay"></action>
-					<action function="page">rebootcheck</action>
+					<action function="set">tw_back=reboot</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -11431,15 +11347,7 @@
 					chown -R media_rw:media_rw /sdcard/TWRP/theme
 					</action>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
@@ -11763,15 +11671,7 @@
 					</action>
 					<action function="overlay"></action>
 					<action function="set">tw_back=reboot</action>
-					<action function="set">tw_action=reboot</action>
-					<action function="set">tw_action_param=recovery</action>
-					<action function="set">tw_has_action2=0</action>
-					<action function="set">tw_text1=No OS Installed!</action>
-					<action function="set">tw_text2=Are you sure you wish to restart?</action>
-					<action function="set">tw_action_text1=Restarting...</action>
-					<action function="set">tw_complete_text1=Restarting...</action>
-					<action function="set">tw_slider_text=Swipe to Restart</action>
-					<action function="page">rebootcheck</action>
+					<action function="page">reboot_recovery_routine</action>
 				</actions>
 			</object>
 
