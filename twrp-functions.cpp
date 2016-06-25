@@ -545,8 +545,9 @@ void TWFunc::Update_Log_File(void) {
 	if (Part != NULL) {
 		struct bootloader_message boot;
 		memset(&boot, 0, sizeof(boot));
-		if (set_bootloader_message(&boot) != 0)
-			LOGERR("Unable to set bootloader message.\n");
+		std::string err;
+		if (!write_bootloader_message(boot, &err))
+			LOGERR("%s\n", err.c_str());
 	}
 
 	if (PartitionManager.Mount_By_Path("/cache", true)) {
