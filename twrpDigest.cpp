@@ -48,47 +48,13 @@ void twrpDigest::setfn(const string& fn) {
 	md5fn = fn;
 }
 
-void twrpDigest::initMD5(void) {
-	MD5Init(&md5c);
-	md5string = "";
-}
-
-int twrpDigest::updateMD5stream(unsigned char* stream, int len) {
-	if (md5fn.empty()) {
-		MD5Update(&md5c, stream, len);
-	}
-	else {
-		return -1;
-	}
-	return 0;
-}
-
-void twrpDigest::finalizeMD5stream() {
-	MD5Final(md5sum, &md5c);
-}
-
-string twrpDigest::createMD5string() {
-	int i;
-	char hex[3];
-
-	for (i = 0; i < 16; ++i) {
-		snprintf(hex, 3, "%02x", md5sum[i]);
-		md5string += hex;
-	}
-	if (!md5fn.empty()) {
-		md5string += "  ";
-		md5string += basename((char*) md5fn.c_str());
-		md5string +=  + "\n";
-	}
-	return md5string;
-}
-
 int twrpDigest::computeMD5(void) {
 	string line;
+	struct MD5Context md5c;
 	FILE *file;
 	int len;
 	unsigned char buf[1024];
-	initMD5();
+	MD5Init(&md5c);
 	file = fopen(md5fn.c_str(), "rb");
 	if (file == NULL)
 		return -1;
@@ -101,13 +67,21 @@ int twrpDigest::computeMD5(void) {
 }
 
 int twrpDigest::write_md5digest(void) {
-	string md5file, md5str;
+	int i;
+	string md5string, md5file;
+	char hex[3];
 	md5file = md5fn + ".md5";
 
-	md5str = createMD5string();
-	TWFunc::write_file(md5file, md5str);
+	for (i = 0; i < 16; ++i) {
+		snprintf(hex, 3, "%02x", md5sum[i]);
+		md5string += hex;
+	}
+	md5string += "  ";
+	md5string += basename((char*) md5fn.c_str());
+	md5string +=  + "\n";
+	TWFunc::write_file(md5file, md5string);
 	tw_set_default_metadata(md5file.c_str());
-	LOGINFO("MD5 for %s: %s\n", md5fn.c_str(), md5str.c_str());
+	LOGINFO("MD5 for %s: %s\n", md5fn.c_str(), md5string.c_str());
 	return 0;
 }
 
@@ -150,7 +124,7 @@ int twrpDigest::verify_md5digest(void) {
 	string buf;
 	char hex[3];
 	int i, ret;
-	string md5str;
+	string md5string;
 
 	ret = read_md5digest();
 	if (ret != 0)
@@ -162,9 +136,9 @@ int twrpDigest::verify_md5digest(void) {
 	computeMD5();
 	for (i = 0; i < 16; ++i) {
 		snprintf(hex, 3, "%02x", md5sum[i]);
-		md5str += hex;
+		md5string += hex;
 	}
-	if (tokens.at(0) != md5str) {
+	if (tokens.at(0) != md5string) {
 		gui_err("md5_fail=MD5 does not match");
 		return -2;
 	}
