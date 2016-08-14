@@ -2125,35 +2125,16 @@ bool MultiROM::installFromBackup(std::string name, std::string path, int type)
 	if(path.find("/data/media") == 0)
 		path.replace(0, 5, REALDATA);
 
-	PartitionSettings sys_part_settings;
-	PartitionSettings data_part_settings;
-
-	sys_part_settings.Restore_Name = path;
-	sys_part_settings.Part = NULL;
-	sys_part_settings.partition_count = 0;
-	sys_part_settings.total_restore_size = 0;
-	sys_part_settings.adbbackup = false;
-	sys_part_settings.PM_Method = PM_RESTORE;
-
-	data_part_settings.Restore_Name = path;
-	data_part_settings.Part = NULL;
-	data_part_settings.partition_count = 0;
-	data_part_settings.total_restore_size = 0;
-	data_part_settings.adbbackup = false;
-	data_part_settings.PM_Method = PM_RESTORE;
-
+	unsigned long long total_restore_size = 0, already_restored_size = 0;
 	bool res = false;
-
-	sys_part_settings.Part = PartitionManager.Find_Partition_By_Path("/system");
-	data_part_settings.Part = PartitionManager.Find_Partition_By_Path("/data");
-	if(sys_part_settings.Part && data_part_settings.Part)
+	ProgressTracking progress(total_restore_size);
+	TWPartition *sys_part = PartitionManager.Find_Partition_By_Path("/system");
+	TWPartition *data_part = PartitionManager.Find_Partition_By_Path("/data");
+	if(sys_part && data_part)
 	{
-		sys_part_settings.total_restore_size += sys_part_settings.Part->Get_Restore_Size(&sys_part_settings);
-		data_part_settings.total_restore_size += data_part_settings.Part->Get_Restore_Size(&data_part_settings);
-		ProgressTracking progress(sys_part_settings.total_restore_size + data_part_settings.total_restore_size);
 		PartitionManager.Set_Restore_Files(path);
-		res = PartitionManager.Restore_Partition(&sys_part_settings) &&
-				(!has_data || PartitionManager.Restore_Partition(&data_part_settings));
+		res = PartitionManager.Restore_Partition(sys_part, path, &progress) &&
+				(!has_data || PartitionManager.Restore_Partition(data_part, path, &progress));
 	}
 	else
 	{
