@@ -38,12 +38,12 @@
 #include "data.hpp"
 #include "twrp-functions.hpp"
 #include "fixContexts.hpp"
-#include "twrpDigest.hpp"
 #include "exclude.hpp"
 #include "set_metadata.h"
 #include "tw_atomic.hpp"
 #include "gui/gui.hpp"
 #include "progresstracking.hpp"
+#include "twrpDigestDriver.hpp"
 
 #ifdef TW_HAS_MTP
 #include "mtp/mtp_MtpServer.hpp"
@@ -503,62 +503,7 @@ int TWPartitionManager::Check_Backup_Name(bool Display_Error) {
 	return 0;
 }
 
-bool TWPartitionManager::Make_MD5(bool generate_md5, string Backup_Folder, string Backup_Filename)
-{
-	string command;
-	string Full_File = Backup_Folder + Backup_Filename;
-	string result;
-	twrpDigest md5sum;
-
-	if (!generate_md5)
-		return true;
-
-	TWFunc::GUI_Operation_Text(TW_GENERATE_MD5_TEXT, gui_parse_text("{@generating_md51}"));
-	gui_msg("generating_md52= * Generating md5...");
-
-	if (TWFunc::Path_Exists(Full_File)) {
-		md5sum.setfn(Backup_Folder + Backup_Filename);
-		if (md5sum.computeMD5() == 0)
-			if (md5sum.write_md5digest() == 0)
-				gui_msg("md5_created= * MD5 Created.");
-			else
-				return -1;
-		else
-			gui_err("md5_error= * MD5 Error!");
-	} else {
-		char filename[512];
-		int index = 0;
-		string strfn;
-		sprintf(filename, "%s%03i", Full_File.c_str(), index);
-		strfn = filename;
-		while (index < 1000) {
-			md5sum.setfn(filename);
-			if (TWFunc::Path_Exists(filename)) {
-				if (md5sum.computeMD5() == 0) {
-					if (md5sum.write_md5digest() != 0)
-					{
-						gui_err("md5_error= * MD5 Error!");
-						return false;
-					}
-				} else {
-					gui_err("md5_compute_error= * Error computing MD5.");
-					return false;
-				}
-			}
-			index++;
-			sprintf(filename, "%s%03i", Full_File.c_str(), index);
-			strfn = filename;
-		}
-		if (index == 0) {
-			LOGERR("Backup file: '%s' not found!\n", filename);
-			return false;
-		}
-		gui_msg("md5_created= * MD5 Created.");
-	}
-	return true;
-}
-
-bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backup_Folder, bool generate_md5, unsigned long *img_time, unsigned long *file_time, ProgressTracking *progress) {
+bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backup_Folder, bool generate_digest, unsigned long *img_time, unsigned long *file_time, ProgressTracking *progress) {
 	time_t start, stop;
 	int use_compression;
 
@@ -573,7 +518,7 @@ bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backu
 	time(&start);
 
 	if (Part->Backup(Backup_Folder, tar_fork_pid, progress)) {
-		bool md5Success = false;
+		bool digestSuccess = false;
 		if (Part->Has_SubPartition) {
 			std::vector<TWPartition*>::iterator subpart;
 
@@ -588,7 +533,7 @@ bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backu
 					}
 					sync();
 					sync();
-					if (!Make_MD5(generate_md5, Backup_Folder, (*subpart)->Backup_FileName)) {
+					if (!twrpDigestDriver::Make_Digest(generate_digest, Backup_Folder, (*subpart)->Backup_FileName)) {
 						TWFunc::SetPerformanceMode(false);
 						return false;
 					}
@@ -604,9 +549,9 @@ bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backu
 			*img_time += backup_time;
 		}
 
-		md5Success = Make_MD5(generate_md5, Backup_Folder, Part->Backup_FileName);
+		digestSuccess = twrpDigestDriver::Make_Digest(generate_digest, Backup_Folder, Part->Backup_FileName);
 		TWFunc::SetPerformanceMode(false);
-		return md5Success;
+		return digestSuccess;
 	} else {
 		Clean_Backup_Folder(Backup_Folder);
 		TWFunc::copy_file("/tmp/recovery.log", backup_log, 0644);
@@ -621,6 +566,13 @@ void TWPartitionManager::Clean_Backup_Folder(string Backup_Folder) {
 	DIR *d = opendir(Backup_Folder.c_str());
 	struct dirent *p;
 	int r;
+	vector<string> ext;
+
+	//extensions we should delete when cleaning
+	ext.push_back("win");
+	ext.push_back("md5");
+	ext.push_back("sha2");
+	ext.push_back("info");
 
 	gui_msg("backup_clean=Backup Failed. Cleaning Backup Folder.");
 
@@ -636,10 +588,11 @@ void TWPartitionManager::Clean_Backup_Folder(string Backup_Folder) {
 		string path = Backup_Folder + p->d_name;
 
 		size_t dot = path.find_last_of(".") + 1;
-		if (path.substr(dot) == "win" || path.substr(dot) == "md5" || path.substr(dot) == "info") {
-			r = unlink(path.c_str());
-			if (r != 0) {
-				LOGINFO("Unable to unlink '%s: %s'\n", path.c_str(), strerror(errno));
+		for (vector<string>::const_iterator i = ext.begin(); i != ext.end(); ++i) {
+			if (path.substr(dot) == *i) {
+				r = unlink(path.c_str());
+				if (r != 0)
+					LOGINFO("Unable to unlink '%s: %s'\n", path.c_str(), strerror(errno));
 			}
 		}
 	}
@@ -674,7 +627,7 @@ int TWPartitionManager::Cancel_Backup() {
 }
 
 int TWPartitionManager::Run_Backup(void) {
-	int do_md5, partition_count = 0, disable_free_space_check = 0;
+	int skip_digest, partition_count = 0, disable_free_space_check = 0;
 	string Backup_Folder, Backup_Name, Full_Backup_Path, Backup_List, backup_path;
 	unsigned long long total_bytes = 0, file_bytes = 0, img_bytes = 0, free_space = 0, img_bytes_remaining, file_bytes_remaining;
 	unsigned long img_time = 0, file_time = 0;
@@ -695,11 +648,11 @@ int TWPartitionManager::Run_Backup(void) {
 	if (!Mount_Current_Storage(true))
 		return false;
 
-	DataManager::GetValue(TW_SKIP_MD5_GENERATE_VAR, do_md5);
-	if (do_md5 == 0)
-		do_md5 = true;
+	DataManager::GetValue(TW_SKIP_DIGEST_GENERATE_VAR, skip_digest);
+	if (skip_digest == 0)
+		skip_digest = true;
 	else
-		do_md5 = false;
+		skip_digest = false;
 
 	DataManager::GetValue(TW_BACKUPS_FOLDER_VAR, Backup_Folder);
 	DataManager::GetValue(TW_BACKUP_NAME, Backup_Name);
@@ -793,7 +746,7 @@ int TWPartitionManager::Run_Backup(void) {
 		backup_path = Backup_List.substr(start_pos, end_pos - start_pos);
 		backup_part = Find_Partition_By_Path(backup_path);
 		if (backup_part != NULL) {
-			if (!Backup_Partition(backup_part, Full_Backup_Path, do_md5, &img_time, &file_time, &progress))
+			if (!Backup_Partition(backup_part, Full_Backup_Path, skip_digest, &img_time, &file_time, &progress))
 				return false;
 		} else {
 			gui_msg(Msg(msg::kError, "unable_to_locate_partition=Unable to locate '{1}' partition for backup calculations.")(backup_path));
@@ -879,7 +832,7 @@ bool TWPartitionManager::Restore_Partition(TWPartition* Part, const string& Rest
 }
 
 int TWPartitionManager::Run_Restore(const string& Restore_Name) {
-	int check_md5, partition_count = 0;
+	int check_digest, partition_count = 0;
 	TWPartition* restore_part = NULL;
 
 	time_t rStart, rStop;
@@ -894,13 +847,13 @@ int TWPartitionManager::Run_Restore(const string& Restore_Name) {
 	if (!Mount_Current_Storage(true))
 		return false;
 
-	DataManager::GetValue(TW_SKIP_MD5_CHECK_VAR, check_md5);
-	if (check_md5 > 0) {
-		// Check MD5 files first before restoring to ensure that all of them match before starting a restore
-		TWFunc::GUI_Operation_Text(TW_VERIFY_MD5_TEXT, gui_parse_text("{@verifying_md5}"));
-		gui_msg("verifying_md5=Verifying MD5");
+	DataManager::GetValue(TW_SKIP_DIGEST_CHECK_VAR, check_digest);
+	if (check_digest > 0) {
+		// Check Digest files first before restoring to ensure that all of them match before starting a restore
+		TWFunc::GUI_Operation_Text(TW_VERIFY_DIGEST_TEXT, gui_parse_text("{@verifying_digest}"));
+		gui_msg("verifying_digest=Verifying Digest");
 	} else {
-		gui_msg("skip_md5=Skipping MD5 check based on user setting.");
+		gui_msg("skip_digest=Skipping Digest check based on user setting.");
 	}
 	gui_msg("calc_restore=Calculating restore details...");
 	DataManager::GetValue("tw_restore_selected", Restore_List);
@@ -914,7 +867,7 @@ int TWPartitionManager::Run_Restore(const string& Restore_Name) {
 					gui_msg(Msg(msg::kError, "restore_read_only=Cannot restore {1} -- mounted read only.")(restore_part->Backup_Display_Name));
 					return false;
 				}
-				if (check_md5 > 0 && !restore_part->Check_MD5(Restore_Name))
+				if (check_digest > 0 && !twrpDigestDriver::Check_Digest(Restore_Name))
 					return false;
 				partition_count++;
 				total_restore_size += restore_part->Get_Restore_Size(Restore_Name);
@@ -923,7 +876,7 @@ int TWPartitionManager::Run_Restore(const string& Restore_Name) {
 
 					for (subpart = Partitions.begin(); subpart != Partitions.end(); subpart++) {
 						if ((*subpart)->Is_SubPartition && (*subpart)->SubPartition_Of == restore_part->Mount_Point) {
-							if (check_md5 > 0 && !(*subpart)->Check_MD5(Restore_Name))
+							if (check_digest > 0 && !twrpDigestDriver::Check_Digest(Restore_Name))
 								return false;
 							total_restore_size += (*subpart)->Get_Restore_Size(Restore_Name);
 						}

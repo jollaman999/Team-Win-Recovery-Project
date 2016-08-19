@@ -40,7 +40,6 @@
 #include "partitions.hpp"
 #include "data.hpp"
 #include "twrp-functions.hpp"
-#include "twrpDigest.hpp"
 #include "twrpTar.hpp"
 #include "exclude.hpp"
 #include "infomanager.hpp"
@@ -1659,50 +1658,6 @@ bool TWPartition::Backup(const string& backup_folder, pid_t &tar_fork_pid, Progr
 		return Backup_Dump_Image(backup_folder, progress);
 	LOGERR("Unknown backup method for '%s'\n", Mount_Point.c_str());
 	return false;
-}
-
-bool TWPartition::Check_Restore_File_MD5(const string& Filename) {
-	twrpDigest md5sum;
-
-	md5sum.setfn(Filename);
-	switch (md5sum.verify_md5digest()) {
-	case MD5_OK:
-		gui_msg(Msg("md5_matched=MD5 matched for '{1}'.")(Filename));
-		return true;
-	case MD5_FILE_UNREADABLE:
-	case MD5_NOT_FOUND:
-		gui_msg(Msg(msg::kError, "no_md5_found=No md5 file found for '{1}'. Please unselect Enable MD5 verification to restore.")(Filename));
-		break;
-	case MD5_MATCH_FAIL:
-		gui_msg(Msg(msg::kError, "md5_fail_match=MD5 failed to match on '{1}'.")(Filename));
-		break;
-	}
-	return false;
-}
-
-bool TWPartition::Check_MD5(string restore_folder) {
-	string Full_Filename;
-	char split_filename[512];
-	int index = 0;
-
-	sync();
-
-	Full_Filename = restore_folder + "/" + Backup_FileName;
-	if (!TWFunc::Path_Exists(Full_Filename)) {
-		// This is a split archive, we presume
-		memset(split_filename, 0, sizeof(split_filename));
-		while (index < 1000) {
-			sprintf(split_filename, "%s%03i", Full_Filename.c_str(), index);
-			if (!TWFunc::Path_Exists(split_filename))
-				break;
-			LOGINFO("split_filename: %s\n", split_filename);
-			if (!Check_Restore_File_MD5(split_filename))
-				return false;
-			index++;
-		}
-		return true;
-	}
-	return Check_Restore_File_MD5(Full_Filename); // Single file archive
 }
 
 bool TWPartition::Restore(const string& restore_folder, ProgressTracking *progress) {

@@ -79,7 +79,6 @@ public:
 	bool Can_Resize();                                                        // Checks to see if we have everything needed to be able to resize the current file system
 	bool Resize();                                                            // Resizes the current file system
 	bool Backup(const string& backup_folder, pid_t &tar_fork_pid, ProgressTracking *progress); // Backs up the partition to the folder specified
-	bool Check_MD5(string restore_folder);                                    // Checks MD5 of a backup
 	bool Restore(const string& restore_folder, ProgressTracking *progress);   // Restores the partition using the backup folder provided
 	unsigned long long Get_Restore_Size(const string& restore_folder);        // Returns the overall restore size of the backup
 	string Backup_Method_By_Name();                                           // Returns a string of the backup method for human readable output
@@ -316,7 +315,6 @@ public:
 private:
 	void Setup_Settings_Storage_Partition(TWPartition* Part);                 // Sets up settings storage
 	void Setup_Android_Secure_Location(TWPartition* Part);                    // Sets up .android_secure if needed
-	bool Make_MD5(bool generate_md5, string Backup_Folder, string Backup_Filename); // Generates an MD5 after a backup is made
 	bool Backup_Partition(TWPartition* Part, const string& Backup_Folder, bool generate_md5, unsigned long *img_time, unsigned long *file_time, ProgressTracking *progress);
 	bool Restore_Partition(TWPartition* Part, const string& Restore_Name, ProgressTracking *progress);
 	void Output_Partition(TWPartition* Part);                                 // Outputs partition details to the log

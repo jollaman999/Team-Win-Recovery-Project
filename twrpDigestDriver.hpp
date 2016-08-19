@@ -1,5 +1,5 @@
 /*
-        Copyright 2012 to 2016 bigbiff/Dees_Troy TeamWin
+        Copyright 2013 to 2017 TeamWin
         This file is part of TWRP/TeamWin Recovery Project.
 
         TWRP is free software: you can redistribute it and/or modify
@@ -16,31 +16,18 @@
         along with TWRP.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-extern "C" {
-	#include "digest/md5.h"
-}
+#ifndef __TWRP_DIGEST_DRIVER
+#define __TWRP_DIGEST_DRIVER
+#include <string>
+#include "twrpDigest/twrpDigest.hpp"
 
-/* verify_md5digest return codes */
-enum {
-	MD5_MATCH_FAIL = -2, // -2: md5 did not match
-	MD5_NOT_FOUND,       // -1: no md5 file found
-	MD5_OK,              //  0: md5 matches
-	MD5_FILE_UNREADABLE  //  1: md5 file unreadable
-};
-
-using namespace std;
-
-class twrpDigest
-{
+class twrpDigestDriver {
 public:
-	void setfn(const string& fn);
-	int computeMD5(void);
-	int verify_md5digest(void);
-	int write_md5digest(void);
 
-private:
-	int read_md5digest(void);
-	string md5fn;
-	string line;
-	unsigned char md5sum[MD5LENGTH];
+	static bool Check_Restore_File_Digest(const string& Filename);					//Check the digest of a TWRP partition backup
+	static bool Check_Digest(string Full_Filename);							//Check to make sure the digest is correct
+	static bool Write_Digest(string Full_Filename);							//Write the digest to a file
+	static bool Make_Digest(bool generate_digest, string Backup_Folder, string Backup_Filename);	//Create the digest for a partition backup
+	static bool stream_file_to_digest(string filename, twrpDigest* digest); 			//Stream the file to twrpDigest
 };
+#endif //__TWRP_DIGEST_DRIVER

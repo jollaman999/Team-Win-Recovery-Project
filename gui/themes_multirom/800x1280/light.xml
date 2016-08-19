@@ -362,16 +362,16 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row4_2_y%" />
 				<font resource="body2" color="%text%" />
-				<text>Skip MD5 generation on backups</text>
-				<data variable="tw_skip_md5_generate" />
+				<text>Skip Digest generation on backups</text>
+				<data variable="tw_skip_digest_generate" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
 
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row4_3a_y%" />
 				<font resource="body2" color="%text%" />
-				<text>Enable MD5 checking of backup files</text>
-				<data variable="tw_skip_md5_check" />
+				<text>Enable Digest checking of backup files</text>
+				<data variable="tw_skip_digest_check" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
 
@@ -6375,8 +6375,8 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row7_1_y%" />
 				<font resource="body2" color="%text%" />
-				<text>Skip MD5 generation</text>
-				<data variable="tw_skip_md5_generate" />
+				<text>Skip Digest generation</text>
+				<data variable="tw_skip_digest_generate" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
 
@@ -7170,8 +7170,8 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row6_3a_y%" />
 				<font resource="body2" color="%text%" />
-				<text>Check MD5 of backup files</text>
-				<data variable="tw_skip_md5_check" />
+				<text>Check Digest of backup files</text>
+				<data variable="tw_skip_digest_check" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
 

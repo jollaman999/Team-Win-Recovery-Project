@@ -181,7 +181,7 @@ int OpenRecoveryScript::run_script_file(void) {
 				// Restore
 				DataManager::SetValue("tw_action_text2", gui_parse_text("{@restore}"));
 				PartitionManager.Mount_All_Storage();
-				DataManager::SetValue(TW_SKIP_MD5_CHECK_VAR, 0);
+				DataManager::SetValue(TW_SKIP_DIGEST_CHECK_VAR, 0);
 				char folder_path[512], partitions[512];
 
 				string val = value, restore_folder, restore_partitions;
@@ -264,8 +264,8 @@ int OpenRecoveryScript::run_script_file(void) {
 							Restore_List += "/sd-ext;";
 							gui_msg("sdext=SD-EXT");
 						} else if (value2[i] == 'M' || value2[i] == 'm') {
-							DataManager::SetValue(TW_SKIP_MD5_CHECK_VAR, 1);
-							gui_msg("md5_check_skip=MD5 check skip is on");
+							DataManager::SetValue(TW_SKIP_DIGEST_CHECK_VAR, 1);
+							gui_msg("digest_check_skip=Digest check skip is on");
 						}
 					}
 
@@ -517,7 +517,7 @@ int OpenRecoveryScript::Backup_Command(string Options) {
 	strcpy(value1, Options.c_str());
 
 	DataManager::SetValue(TW_USE_COMPRESSION_VAR, 0);
-	DataManager::SetValue(TW_SKIP_MD5_GENERATE_VAR, 0);
+	DataManager::SetValue(TW_SKIP_DIGEST_GENERATE_VAR, 0);
 
 	gui_msg("select_backup_opt=Setting backup options:");
 	line_len = Options.size();
@@ -553,8 +553,8 @@ int OpenRecoveryScript::Backup_Command(string Options) {
 			DataManager::SetValue(TW_USE_COMPRESSION_VAR, 1);
 			gui_msg("compression_on=Compression is on");
 		} else if (Options.substr(i, 1) == "M" || Options.substr(i, 1) == "m") {
-			DataManager::SetValue(TW_SKIP_MD5_GENERATE_VAR, 1);
-			gui_msg("md5_off=MD5 Generation is off");
+			DataManager::SetValue(TW_SKIP_DIGEST_GENERATE_VAR, 1);
+			gui_msg("digest_off=Digest Generation is off");
 		}
 	}
 	DataManager::SetValue("tw_backup_list", Backup_List);
