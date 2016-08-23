@@ -4002,31 +4002,35 @@
 		</page>
 
 		<page name="reboot_recovery_routine">
-			<actions>
-				<action function="set">tw_action=reboot</action>
-				<action function="set">tw_action_param=recovery</action>
-				<action function="set">tw_has_action2=0</action>
-				<action function="set">tw_text1=No OS Installed!</action>
-				<action function="set">tw_text2=Are you sure you wish to restart?</action>
-				<action function="set">tw_action_text1=Restarting...</action>
-				<action function="set">tw_complete_text1=Restarting...</action>
-				<action function="set">tw_slider_text=Swipe to Restart</action>
-				<action function="page">rebootcheck</action>
-			</actions>
+			<object type="action">
+				<actions>
+					<action function="set">tw_action=reboot</action>
+					<action function="set">tw_action_param=recovery</action>
+					<action function="set">tw_has_action2=0</action>
+					<action function="set">tw_text1=No OS Installed!</action>
+					<action function="set">tw_text2=Are you sure you wish to restart?</action>
+					<action function="set">tw_action_text1=Restarting...</action>
+					<action function="set">tw_complete_text1=Restarting...</action>
+					<action function="set">tw_slider_text=Swipe to Restart</action>
+					<action function="page">rebootcheck</action>
+				</actions>
+			</object>
 		</page>
 
 		<page name="reboot_system_routine">
-			<action>
-				<action function="set">tw_action=reboot</action>
-				<action function="set">tw_action_param=system</action>
-				<action function="set">tw_has_action2=0</action>
-				<action function="set">tw_text1=No OS Installed!</action>
-				<action function="set">tw_text2=Are you sure you wish to restart?</action>
-				<action function="set">tw_action_text1=Restarting...</action>
-				<action function="set">tw_complete_text1=Restarting...</action>
-				<action function="set">tw_slider_text=Swipe to Restart</action>
-				<action function="page">rebootcheck</action>
-			</action>
+			<object type="action">
+				<actions>
+					<action function="set">tw_action=reboot</action>
+					<action function="set">tw_action_param=system</action>
+					<action function="set">tw_has_action2=0</action>
+					<action function="set">tw_text1=No OS Installed!</action>
+					<action function="set">tw_text2=Are you sure you wish to restart?</action>
+					<action function="set">tw_action_text1=Restarting...</action>
+					<action function="set">tw_complete_text1=Restarting...</action>
+					<action function="set">tw_slider_text=Swipe to Restart</action>
+					<action function="page">rebootcheck</action>
+				</actions>
+			</object>
 		</page>
 
 		<page name="confirm_action">
