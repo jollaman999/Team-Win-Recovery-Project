@@ -63,6 +63,8 @@ struct selabel_handle *selinux_handle;
 #include "multirom/multirom.h"
 #endif //TARGET_RECOVERY_IS_MULTIROM
 
+extern int adb_server_main(int is_daemon, int server_port, int /* reply_fd */);
+
 TWPartitionManager PartitionManager;
 int Log_Offset;
 bool datamedia;
