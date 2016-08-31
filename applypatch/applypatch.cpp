@@ -120,7 +120,7 @@ static int LoadPartitionContents(const char* filename, FileContents* file) {
         type = MTD;
     } else if (pieces[0] == "EMMC") {
         type = EMMC;
-    } else if (strcmp(magic, "BML") == 0) {
+    } else if (pieces[0] == "BML") {
         type = EMMC;
     } else {
         printf("LoadPartitionContents called with bad filename (%s)\n", filename);
@@ -128,7 +128,7 @@ static int LoadPartitionContents(const char* filename, FileContents* file) {
     }
     const char* partition = pieces[1].c_str();
 
-    if (strcmp(magic, "BML") == 0) {
+    if (pieces[0] == "BML") {
         if (strcmp(partition, "boot") == 0) {
             partition = BOARD_BML_BOOT;
         } else if (strcmp(partition, "recovery") == 0) {
@@ -332,7 +332,7 @@ int WriteToPartition(const unsigned char* data, size_t len, const char* target) 
         type = MTD;
     } else if (pieces[0] == "EMMC") {
         type = EMMC;
-    } else if (strcmp(magic, "BML") == 0) {
+    } else if (pieces[0] == "BML") {
         type = EMMC;
     } else {
         printf("WriteToPartition called with bad target (%s)\n", target);
@@ -341,7 +341,7 @@ int WriteToPartition(const unsigned char* data, size_t len, const char* target) 
 
     const char* partition = pieces[1].c_str();
 
-    if (strcmp(magic, "BML") == 0) {
+    if (pieces[0] == "BML") {
         if (strcmp(partition, "boot") == 0) {
             partition = BOARD_BML_BOOT;
         } else if (strcmp(partition, "recovery") == 0) {
