@@ -27,6 +27,7 @@
 #include "../variables.h"
 #include "../openrecoveryscript.hpp"
 #include "../fuse_sideload.h"
+#include "../gui/blanktimer.hpp"
 #include "multiromedify.h"
 
 extern "C" {
@@ -925,6 +926,9 @@ bool MultiROM::flashZip(std::string rom, std::string file)
 	if(!prepareZIP(file, &hacker, restore_script))  // may change file var
 		return false;
 
+	// unblank here so we can see some progress (kinda optional)
+	blankTimer.resetTimerAndUnblank();
+
 	if(!changeMounts(rom))
 	{
 		gui_print("Failed to change mountpoints!\n");
@@ -947,6 +951,10 @@ bool MultiROM::flashZip(std::string rom, std::string file)
 		if(!createFakeSystemImg())
 			goto exit;
 	}
+
+	// unblank here is necessary; if we don't bring the screen back up and the zip has an AROMA
+	// Installer, it will take over the screen and buttons and we won't be able to manually wake the screen
+	blankTimer.resetTimerAndUnblank();
 
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, 0);
 	status = TWinstall_zip(file.c_str(), &wipe_cache);
@@ -1006,6 +1014,8 @@ bool MultiROM::flashORSZip(std::string file, int *wipe_cache)
 		if(!createFakeSystemImg())
 			return false;
 	}
+
+	blankTimer.resetTimerAndUnblank(); // same as above (about AROMA Installer)
 
 	DataManager::SetValue(TW_SIGNED_ZIP_VERIFY_VAR, 0);
 	status = TWinstall_zip(file.c_str(), wipe_cache);
