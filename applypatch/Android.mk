@@ -53,8 +53,6 @@ LOCAL_STATIC_LIBRARIES += libcrypto_static libbz libz
 include $(BUILD_HOST_STATIC_LIBRARY)
 endif  # HOST_OS == linux
 
-include $(BUILD_EXECUTABLE)
-
 include $(CLEAR_VARS)
 
 LOCAL_CLANG := true

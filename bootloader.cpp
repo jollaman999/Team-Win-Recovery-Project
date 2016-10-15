@@ -59,6 +59,7 @@ static int set_bootloader_message_block(const bootloader_message* in, const Volu
 
 int get_bootloader_message(bootloader_message* out) {
 #if 0
+    Volume* v = volume_for_path("/misc");
     if (v == nullptr) {
         LOGE("Cannot load volume /misc!\n");
         return -1;
@@ -214,6 +215,7 @@ static int get_bootloader_message_block(bootloader_message* out,
     fseek(f, BOARD_RECOVERY_BLDRMSG_OFFSET, SEEK_SET);
 #endif
     bootloader_message temp;
+
     int count = fread(&temp, sizeof(temp), 1, f);
     if (count != 1) {
         LOGE("failed to read \"%s\": %s\n", v->blk_device, strerror(errno));
