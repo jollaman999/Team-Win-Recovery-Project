@@ -32,6 +32,7 @@ extern "C" {
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <unistd.h>
 #include <vector>
 #include <csignal>
 #include <dirent.h>

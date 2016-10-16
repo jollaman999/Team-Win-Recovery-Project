@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
 	if (argc == 3 && strcmp(argv[1], "--adbd") == 0) {
 		property_set("ctl.stop", "adbd");
 #ifdef TW_USE_NEW_MINADBD
-		adb_server_main(0, DEFAULT_ADB_PORT);
+		adb_server_main(0, DEFAULT_ADB_PORT, -1);
 #else
 		adb_main(argv[2]);
 #endif

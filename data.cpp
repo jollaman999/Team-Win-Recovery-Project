@@ -826,9 +826,9 @@ void DataManager::SetDefaultValues()
 	*/
 
 	// doesn't seem to be used but add it back anyway
-	mConstValues.insert(make_pair("tw_device_name", TARGET_DEVICE));
+	mConst.SetValue("tw_device_name", TARGET_DEVICE);
 
-	mValues.insert(make_pair(TW_AUTO_INJECT_MROM, make_pair("1", 1)));
+	mPersist.SetValue(TW_AUTO_INJECT_MROM, "1");
 #endif //TARGET_RECOVERY_IS_MULTIROM
 
 	LOGINFO("LANG: %s\n", EXPAND(TW_DEFAULT_LANGUAGE));
