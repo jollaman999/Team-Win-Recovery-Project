@@ -148,6 +148,7 @@ private:
 	string Get_Restore_File_System(const string& restore_folder);             // Returns the file system that was in place at the time of the backup
 	bool Restore_Tar(const string& restore_folder, const string& Restore_File_System, ProgressTracking *progress); // Restore using tar for file systems
 	bool Restore_Image(const string& restore_folder, const string& Restore_File_System, ProgressTracking *progress); // Restore using raw read/write for images
+	bool Check_Restore_File_MD5(const string& Filename);                      // Verifies MD5 matches for a file before restoration
 	bool Get_Size_Via_statfs(bool Display_Error);                             // Get Partition size, used, and free space using statfs
 	bool Get_Size_Via_df(bool Display_Error);                                 // Get Partition size, used, and free space using df command
 	bool Make_Dir(string Path, bool Display_Error);                           // Creates a directory if it doesn't already exist
