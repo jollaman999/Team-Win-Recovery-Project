@@ -126,16 +126,7 @@ int EdifyFunc::replaceOffendings(std::list<EdifyElement*> **parentList, std::lis
                 continue;
 
             const std::string& t = ((EdifyValue*)(*itr))->getText();
-            if(t.find("umount") != NPOS)
-            {
-                // check it's the actual umount command, and not part of something longer such as: run_program("/tmp/umount_su_image.sh");
-                if ( is_word(t, "umount", "\"`/;", "\"`/;") )
-                {
-                    rem = true;
-                    break;
-                }
-            }
-            else if(t.find("mount") != NPOS)
+            if(t.find("mount") != std::string::npos)
             {
                 rem = true;
                 break;
