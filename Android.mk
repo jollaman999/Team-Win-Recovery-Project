@@ -651,10 +651,6 @@ else
     LOCAL_SRC_FILES += verifier.cpp
 endif
 
-ifneq ($(BOARD_RECOVERY_BLDRMSG_OFFSET),)
-    LOCAL_CFLAGS += -DBOARD_RECOVERY_BLDRMSG_OFFSET=$(BOARD_RECOVERY_BLDRMSG_OFFSET)
-endif
-
 include $(BUILD_SHARED_LIBRARY)
 
 # All the APIs for testing
