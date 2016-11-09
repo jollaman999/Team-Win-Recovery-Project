@@ -22,7 +22,7 @@ LOCAL_MODULE := libminadbd
 LOCAL_CFLAGS := $(minadbd_cflags)
 LOCAL_CONLY_FLAGS := -Wimplicit-function-declaration
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/.. system/core/adb
-LOCAL_WHOLE_STATIC_LIBRARIES := libadbd
+LOCAL_WHOLE_STATIC_LIBRARIES := libadbd libcrypto_utils_static
 LOCAL_SHARED_LIBRARIES := libbase liblog libcutils libc
 
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -lt 24; echo $$?),0)
