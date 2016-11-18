@@ -1488,10 +1488,10 @@ bool MultiROM::createImage(const std::string& base, const char *img, int size)
 	char cmd[256];
 
 	// make_ext4fs errors out if it has unknown path
-	if(TWFunc::Path_Exists("/file_contexts") &&
-		(!strcmp(img, "data") ||
-		 !strcmp(img, "system") ||
-		 !strcmp(img, "cache"))) {
+	bool is_known_path = !strcmp(img, "data") || !strcmp(img, "system") || !strcmp(img, "cache");
+	if (TWFunc::Path_Exists("/file_contexts.bin") && is_known_path) {
+		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM -a \"/%s\" -S /file_contexts.bin \"%s/%s.img\"", size, img, base.c_str(), img);
+	} else if (TWFunc::Path_Exists("/file_contexts") && is_known_path) {
 		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM -a \"/%s\" -S /file_contexts \"%s/%s.img\"", size, img, base.c_str(), img);
 	} else {
 		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM \"%s/%s.img\"", size, base.c_str(), img);
