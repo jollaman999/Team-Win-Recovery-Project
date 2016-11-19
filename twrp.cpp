@@ -120,16 +120,6 @@ int main(int argc, char **argv) {
 #ifdef HAVE_SELINUX
 	printf("Setting SELinux to permissive\n");
 	TWFunc::write_file("/sys/fs/selinux/enforce", "0");
-
-	TWFunc::write_file("/file_contexts",
-        "\n\n# MultiROM folders\n"
-        "/data/media/multirom(/.*)?          <<none>>\n"
-        "/data/media/0/multirom(/.*)?        <<none>>\n"
-        "/realdata/media/multirom(/.*)?      <<none>>\n"
-        "/realdata/media/0/multirom(/.*)?    <<none>>\n"
-        "/sdcard/multirom(/.*)?              <<none>>\n"
-        "/mnt/mrom(/.*)?                     <<none>>\n",
-        "ae");
 #endif
 
 	// MultiROM _might_ have crashed the recovery while the boot device was redirected.
@@ -169,21 +159,24 @@ int main(int argc, char **argv) {
 
 #ifdef HAVE_SELINUX
 	if (TWFunc::Path_Exists("/prebuilt_file_contexts")) {
-		if (TWFunc::Path_Exists("/file_contexts")) {
+		if (TWFunc::Path_Exists("/file_contexts.bin")) {
+			printf("Renaming regular /file_contexts.bin -> /file_contexts.bin.bak\n");
+			rename("/file_contexts.bin", "/file_contexts.bin.bak");
+		} else if (TWFunc::Path_Exists("/file_contexts")) {
 			printf("Renaming regular /file_contexts -> /file_contexts.bak\n");
 			rename("/file_contexts", "/file_contexts.bak");
 		}
-		printf("Moving /prebuilt_file_contexts -> /file_contexts\n");
-		rename("/prebuilt_file_contexts", "/file_contexts");
+		printf("Moving /prebuilt_file_contexts -> /file_contexts.bin\n");
+		rename("/prebuilt_file_contexts", "/file_contexts.bin");
 	}
 	struct selinux_opt selinux_options[] = {
-		{ SELABEL_OPT_PATH, "/file_contexts" }
+		{ SELABEL_OPT_PATH, "/file_contexts.bin" }
 	};
 	selinux_handle = selabel_open(SELABEL_CTX_FILE, selinux_options, 1);
 	if (!selinux_handle)
 		printf("No file contexts for SELinux\n");
 	else
-		printf("SELinux contexts loaded from /file_contexts\n");
+		printf("SELinux contexts loaded from /file_contexts.bin\n");
 	{ // Check to ensure SELinux can be supported by the kernel
 		char *contexts = NULL;
 
