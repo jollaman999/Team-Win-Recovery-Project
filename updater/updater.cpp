@@ -36,8 +36,6 @@
 // Where in the package we expect to find the edify script to execute.
 // (Note it's "updateR-script", not the older "update-script".)
 #define SCRIPT_NAME "META-INF/com/google/android/updater-script"
-#define SELINUX_CONTEXTS_ZIP "file_contexts"
-#define SELINUX_CONTEXTS_TMP "/tmp/file_contexts"
 
 extern bool have_eio_error;
 
@@ -103,11 +101,25 @@ int main(int argc, char** argv) {
     }
     script[script_entry->uncompLen] = '\0';
 
-    const ZipEntry* file_contexts_entry = mzFindZipEntry(&za, SELINUX_CONTEXTS_ZIP);
+    const ZipEntry* file_contexts_entry = NULL;
+    string selinux_contexts_zip;
+    string selinux_contexts_tmp;
+    bool selinux_contexts_old = false;
+
+    file_contexts_entry = mzFindZipEntry(&za, "file_contexts.bin";
+    if (file_contexts_entry == NULL) {
+        file_contexts_entry = mzFindZipEntry(Zip, "file_contexts");
+        selinux_contexts_zip = "file_contexts";
+        selinux_contexts_tmp = "/tmp/file_contexts";
+        selinux_contexts_old = true;
+    } else {
+        selinux_contexts_zip = "file_contexts.bin";
+        selinux_contexts_tmp = "/tmp/file_contexts.bin";
+    }
     if (file_contexts_entry != NULL) {
-        int file_contexts_fd = creat(SELINUX_CONTEXTS_TMP, 0644);
+        int file_contexts_fd = creat(selinux_contexts_tmp.c_str(), 0644);
 		if (file_contexts_fd < 0) {
-			fprintf(stderr, "Could not extract %s to '%s'\n", SELINUX_CONTEXTS_ZIP, SELINUX_CONTEXTS_TMP);
+			fprintf(stderr, "Could not extract %s to '%s'\n", selinux_contexts_zip.c_str(), selinux_contexts_tmp.c_str());
 			return 3;
 		}
 
@@ -138,22 +150,38 @@ int main(int argc, char** argv) {
         return 6;
     }
 
-    if (access(SELINUX_CONTEXTS_TMP, R_OK) == 0) {
-        struct selinux_opt seopts[] = {
-          { SELABEL_OPT_PATH, SELINUX_CONTEXTS_TMP }
-        };
+    if (access(selinux_contexts_tmp.c_str(), R_OK) == 0) {
+        if (selinux_contexts_old) {
+            struct selinux_opt seopts[] = {
+            { SELABEL_OPT_PATH, "/tmp/file_contexts" }
+            };
 
-        sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+            sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+        } else {
+            struct selinux_opt seopts[] = {
+            { SELABEL_OPT_PATH, "/tmp/file_contexts.bin" }
+            };
+
+            sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+        }
     } else {
-        struct selinux_opt seopts[] = {
-          { SELABEL_OPT_PATH, "/file_contexts" }
-        };
+        if (selinux_contexts_old) {
+            struct selinux_opt seopts[] = {
+            { SELABEL_OPT_PATH, "file_contexts" }
+            };
 
-        sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+            sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+        } else {
+            struct selinux_opt seopts[] = {
+            { SELABEL_OPT_PATH, "file_contexts.bin" }
+            };
+
+            sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+        }
     }
 
     if (!sehandle) {
-        fprintf(cmd_pipe, "ui_print Warning: No file_contexts\n");
+        fprintf(cmd_pipe, "ui_print Warning: No file_contexts.bin or file_contexts\n");
     }
 
     // Evaluate the parsed script.

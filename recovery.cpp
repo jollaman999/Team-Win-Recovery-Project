@@ -1611,14 +1611,26 @@ int main(int argc, char **argv) {
     ui->SetBackground(RecoveryUI::NONE);
     if (show_text) ui->ShowText(true);
 
-    struct selinux_opt seopts[] = {
-      { SELABEL_OPT_PATH, "/file_contexts" }
-    };
+    if (TWFunc::Path_Exists("/file_contexts.bin")) {
+        struct selinux_opt seopts[] = {
+        { SELABEL_OPT_PATH, "/file_contexts.bin" }
+        };
 
-    sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+        sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
 
-    if (!sehandle) {
-        ui->Print("Warning: No file_contexts\n");
+        if (!sehandle) {
+            ui->Print("Warning: No file_contexts.bin\n");
+        }
+    } else {
+        struct selinux_opt seopts[] = {
+        { SELABEL_OPT_PATH, "/file_contexts" }
+        };
+
+        sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+
+        if (!sehandle) {
+            ui->Print("Warning: No file_contexts\n");
+        }
     }
 
     device->StartRecovery();

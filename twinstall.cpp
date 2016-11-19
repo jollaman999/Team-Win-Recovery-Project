@@ -170,13 +170,21 @@ static int Prepare_Update_Binary(const char *path, ZipArchive *Zip, int* wipe_ca
 	}
 
 	// If exists, extract file_contexts from the zip file
-	const ZipEntry* selinx_contexts = mzFindZipEntry(Zip, "file_contexts");
+	const ZipEntry* selinx_contexts = NULL;
+	string output_filename;
+
+	selinx_contexts = mzFindZipEntry(Zip, "file_contexts.bin");
+	if (selinx_contexts == NULL) {
+		selinx_contexts = mzFindZipEntry(Zip, "file_contexts");
+		output_filename = "/file_contexts";
+	} else {
+		output_filename = "/file_contexts.bin";
+	}
 	if (selinx_contexts == NULL) {
 		mzCloseZipArchive(Zip);
-		LOGINFO("Zip does not contain SELinux file_contexts file in its root.\n");
+		LOGINFO("Zip does not contain SELinux /file_contexts.bin or /file_contexts file.\n");
 	} else {
-		string output_filename = "/file_contexts";
-		LOGINFO("Zip contains SELinux file_contexts file in its root. Extracting to %s\n", output_filename.c_str());
+		LOGINFO("Zip contains SELinux %s file. Extracting to %s\n", output_filename.c_str(), output_filename.c_str());
 		// Delete any file_contexts
 		if (TWFunc::Path_Exists(output_filename) && unlink(output_filename.c_str()) != 0) {
 			LOGINFO("Unable to unlink '%s': %s\n", output_filename.c_str(), strerror(errno));
@@ -194,7 +202,7 @@ static int Prepare_Update_Binary(const char *path, ZipArchive *Zip, int* wipe_ca
 
 		if (!ret_val) {
 			mzCloseZipArchive(Zip);
-			LOGERR("Could not extract '%s'\n", output_filename.c_str());
+			LOGERR("Could not extract '%s' from Zip\n", output_filename.c_str());
 			return INSTALL_ERROR;
 		}
 	}
