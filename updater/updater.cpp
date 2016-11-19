@@ -49,9 +49,6 @@
 // (Note it's "updateR-script", not the older "update-script".)
 static constexpr const char* SCRIPT_NAME = "META-INF/com/google/android/updater-script";
 
-#define SELINUX_CONTEXTS_ZIP "file_contexts"
-#define SELINUX_CONTEXTS_TMP "/tmp/file_contexts"
-
 extern bool have_eio_error;
 
 struct selabel_handle *sehandle;
@@ -173,9 +170,21 @@ int main(int argc, char** argv) {
   }
   ota_io_init(za, state.is_retry);
 
-  if (access(SELINUX_CONTEXTS_TMP, R_OK) == 0) {
+  if (access("/tmp/file_contexts.bin", R_OK) == 0) {
     struct selinux_opt seopts[] = {
-      { SELABEL_OPT_PATH, SELINUX_CONTEXTS_TMP }
+      { SELABEL_OPT_PATH, "/tmp/file_contexts.bin" }
+    };
+
+    sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+  } else if (access("file_contexts.bin", R_OK) == 0) {
+    struct selinux_opt seopts[] = {
+      { SELABEL_OPT_PATH, "/file_contexts.bin" }
+    };
+
+    sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+  } else if (access("/tmp/file_contexts", R_OK) == 0) {
+    struct selinux_opt seopts[] = {
+      { SELABEL_OPT_PATH, "/tmp/file_contexts" }
     };
 
     sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);

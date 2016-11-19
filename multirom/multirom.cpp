@@ -472,23 +472,35 @@ bool MultiROM::restorecon(std::string name)
 {
 	bool res = false;
 	bool replaced_contexts = false;
+	bool file_contexts_old = false;
 
 	std::string file_contexts = getRomsPath() + name;
 	std::string seapp_contexts = file_contexts + "/boot/seapp_contexts";
-	file_contexts += "/boot/file_contexts";
+	if (TWFunc::Path_Exists(file_contexts + "/boot/file_contexts.bin")) {
+		file_contexts += "/boot/file_contexts.bin";
 
-	if(access(file_contexts.c_str(), R_OK) < 0)
-		file_contexts += ".bin";
+		if(access(file_contexts.c_str(), R_OK) >= 0)
+		{
+			gui_print("Using ROM's file_contexts.bin\n");
+			rename("/file_contexts.bin", "/file_contexts.bin.orig");
+			rename("/seapp_contexts", "/seapp_contexts.orig");
+			system_args("cp -a \"%s\" /file_contexts.bin", file_contexts.c_str());
+			system_args("cp -a \"%s\" /seapp_contexts", seapp_contexts.c_str());
+			replaced_contexts = true;
+		}
+	} else if (TWFunc::Path_Exists(file_contexts + "/boot/file_contexts")) {
+		file_contexts += "/boot/file_contexts";
 
-	if(access(file_contexts.c_str(), R_OK) >= 0)
-	{
-		gui_print("Using ROM's file_contexts\n");
-		rename("/file_contexts", "/file_contexts.orig");
-		rename("/file_contexts.bin", "/file_contexts.bin.orig");
-		rename("/seapp_contexts", "/seapp_contexts.orig");
-		system_args("cp -a \"%s\" /%s", file_contexts.c_str(), file_contexts.substr(file_contexts.find_last_of('/')+1).c_str());
-		system_args("cp -a \"%s\" /seapp_contexts", seapp_contexts.c_str());
-		replaced_contexts = true;
+		if(access(file_contexts.c_str(), R_OK) >= 0)
+		{
+			gui_print("Using ROM's file_contexts\n");
+			rename("/file_contexts", "/file_contexts.orig");
+			rename("/seapp_contexts", "/seapp_contexts.orig");
+			system_args("cp -a \"%s\" /file_contexts", file_contexts.c_str());
+			system_args("cp -a \"%s\" /seapp_contexts", seapp_contexts.c_str());
+			replaced_contexts = true;
+			file_contexts_old = true;
+		}
 	}
 
 	if(!changeMounts(name))
@@ -544,9 +556,21 @@ bool MultiROM::restorecon(std::string name)
 	res = true;
 exit:
 	if(replaced_contexts) {
-		if(access("/file_contexts.orig", R_OK) >= 0) rename("/file_contexts.orig", "/file_contexts"); else remove("/file_contexts");
-		if(access("/file_contexts.bin.orig", R_OK) >= 0) rename("/file_contexts.bin.orig", "/file_contexts.bin"); else remove("/file_contexts.bin");
-		if(access("/seapp_contexts.orig", R_OK) >= 0) rename("/seapp_contexts.orig", "/seapp_contexts"); else remove("/seapp_contexts");
+		if (file_contexts_old) {
+			if(access("/file_contexts.orig", R_OK) >= 0)
+				rename("/file_contexts.orig", "/file_contexts");
+			else
+				remove("/file_contexts");
+		} else {
+			if(access("/file_contexts.bin.orig", R_OK) >= 0)
+				rename("/file_contexts.bin.orig", "/file_contexts.bin");
+			else
+				remove("/file_contexts.bin");
+		}
+		if(access("/seapp_contexts.orig", R_OK) >= 0)
+			rename("/seapp_contexts.orig", "/seapp_contexts");
+		else
+			remove("/seapp_contexts");
 	}
 	return res;
 }
@@ -2175,15 +2199,27 @@ bool MultiROM::extractBootForROM(std::string base)
 	}
 
 	// copy needed files
-	static const char *cp_f[] = {
-		"*.rc", "default.prop", "init", "main_init", "fstab.*",
-		// Since Android 4.3 - for SELinux
-		"file_contexts", "file_contexts.bin", "property_contexts", "seapp_contexts", "sepolicy",
-		NULL
-	};
+	if (TWFunc::Path_Exists("/tmp/boot/file_contexts.bin")) {
+		static const char *cp_f[] = {
+			"*.rc", "default.prop", "init", "main_init", "fstab.*",
+			// Since Android 4.3 - for SELinux
+			"file_contexts.bin", "property_contexts", "seapp_contexts", "sepolicy",
+			NULL
+		};
 
-	for(int i = 0; cp_f[i]; ++i)
-		system_args("cp -a /tmp/boot/%s \"%s/boot/\"", cp_f[i], base.c_str());
+		for(int i = 0; cp_f[i]; ++i)
+			system_args("cp -a /tmp/boot/%s \"%s/boot/\"", cp_f[i], base.c_str());
+	} else {
+		static const char *cp_f[] = {
+			"*.rc", "default.prop", "init", "main_init", "fstab.*",
+			// Since Android 4.3 - for SELinux
+			"file_contexts", "property_contexts", "seapp_contexts", "sepolicy",
+			NULL
+		};
+
+		for(int i = 0; cp_f[i]; ++i)
+			system_args("cp -a /tmp/boot/%s \"%s/boot/\"", cp_f[i], base.c_str());
+	}
 
 	// check if main_init exists
 	sprintf(path, "%s/boot/main_init", base.c_str());
