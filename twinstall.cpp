@@ -158,13 +158,24 @@ static int Prepare_Update_Binary(const char *path, ZipWrap *Zip, int* wipe_cache
 	}
 
 	// If exists, extract file_contexts from the zip file
-	if (!Zip->EntryExists("file_contexts")) {
+	string output_filename;
+	string output_filepath;
+	bool file_contexts_found = false;
+	if (Zip->EntryExists("file_contexts.bin")) {
+		output_filename = "file_contexts.bin";
+		file_contexts_found = true;
+	} else if (Zip->EntryExists("file_contexts")) {
+		output_filename = "file_contexts";
+		file_contexts_found = true;
+	} else {
 		Zip->Close();
 		LOGINFO("Zip does not contain SELinux file_contexts file in its root.\n");
-	} else {
-		const string output_filename = "/file_contexts";
-		LOGINFO("Zip contains SELinux file_contexts file in its root. Extracting to %s\n", output_filename.c_str());
-		if (!Zip->ExtractEntry("file_contexts", output_filename, 0644)) {
+	}
+
+	if (file_contexts_found) {
+		output_filepath = "/" + output_filename;
+		LOGINFO("Zip contains SELinux %s file in its root. Extracting to %s\n", output_filename.c_str(), output_filepath.c_str());
+		if (!Zip->ExtractEntry(output_filename, output_filepath, 0644)) {
 			Zip->Close();
 			LOGERR("Could not extract '%s'\n", output_filename.c_str());
 			return INSTALL_ERROR;

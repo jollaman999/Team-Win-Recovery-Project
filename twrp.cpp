@@ -168,22 +168,42 @@ int main(int argc, char **argv) {
 	// Load up all the resources
 	gui_loadResources();
 
+	bool is_new_file_contexts = TWFunc::Path_Exists("/file_contexts.bin");
+	bool is_old_file_contexts = TWFunc::Path_Exists("/file_contexts");
+	string file_contexts_path;
+
 	if (TWFunc::Path_Exists("/prebuilt_file_contexts")) {
-		if (TWFunc::Path_Exists("/file_contexts")) {
+		if (is_new_file_contexts) {
+			printf("Renaming regular /file_contexts.bin -> /file_contexts.bin.bak\n");
+			rename("/file_contexts.bin", "/file_contexts.bin.bak");
+			printf("Moving /prebuilt_file_contexts -> /file_contexts.bin\n");
+			rename("/prebuilt_file_contexts", "/file_contexts.bin");
+		} else if (is_old_file_contexts) {
 			printf("Renaming regular /file_contexts -> /file_contexts.bak\n");
 			rename("/file_contexts", "/file_contexts.bak");
+			printf("Moving /prebuilt_file_contexts -> /file_contexts\n");
+			rename("/prebuilt_file_contexts", "/file_contexts");
 		}
-		printf("Moving /prebuilt_file_contexts -> /file_contexts\n");
-		rename("/prebuilt_file_contexts", "/file_contexts");
 	}
-	struct selinux_opt selinux_options[] = {
-		{ SELABEL_OPT_PATH, "/file_contexts" }
-	};
-	selinux_handle = selabel_open(SELABEL_CTX_FILE, selinux_options, 1);
-	if (!selinux_handle)
+
+	if (is_new_file_contexts)
+		file_contexts_path = "/file_contexts.bin";
+	else if (is_old_file_contexts)
+		file_contexts_path = "/file_contexts";
+
+	if (is_new_file_contexts || is_old_file_contexts) {
+		struct selinux_opt selinux_options[] = {
+			{ SELABEL_OPT_PATH, file_contexts_path.c_str() }
+		};
+		selinux_handle = selabel_open(SELABEL_CTX_FILE, selinux_options, 1);
+		if (!selinux_handle)
+			printf("No file contexts for SELinux\n");
+		else
+			printf("SELinux contexts loaded from %s\n", file_contexts_path.c_str());
+	} else {
 		printf("No file contexts for SELinux\n");
-	else
-		printf("SELinux contexts loaded from /file_contexts\n");
+	}
+
 	{ // Check to ensure SELinux can be supported by the kernel
 		char *contexts = NULL;
 
