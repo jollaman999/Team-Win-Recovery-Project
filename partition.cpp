@@ -42,7 +42,7 @@
 #include "twrp-functions.hpp"
 #include "twrpDigest.hpp"
 #include "twrpTar.hpp"
-#include "twrpDU.hpp"
+#include "exclude.hpp"
 #include "infomanager.hpp"
 #include "set_metadata.h"
 #include "gui/gui.hpp"
@@ -783,9 +783,13 @@ void TWPartition::Setup_Data_Media() {
 		}
 		DataManager::SetValue("tw_has_internal", 1);
 		DataManager::SetValue("tw_has_data_media", 1);
-		du.add_absolute_dir(Mount_Point + "/misc/vold");
-		du.add_absolute_dir(Mount_Point + "/.layout_version");
-		du.add_absolute_dir(Mount_Point + "/system/storage.xml");
+		backup_exclusions.add_absolute_dir("/data/data/com.google.android.music/files");
+		backup_exclusions.add_absolute_dir(Mount_Point + "/misc/vold");
+		wipe_exclusions.add_absolute_dir(Mount_Point + "/misc/vold");
+		backup_exclusions.add_absolute_dir(Mount_Point + "/.layout_version");
+		wipe_exclusions.add_absolute_dir(Mount_Point + "/.layout_version");
+		backup_exclusions.add_absolute_dir(Mount_Point + "/system/storage.xml");
+		wipe_exclusions.add_absolute_dir(Mount_Point + "/system/storage.xml");
 	} else {
 		if (Mount(true) && TWFunc::Path_Exists(Mount_Point + "/media/0")) {
 			Storage_Path = Mount_Point + "/media/0";
@@ -793,7 +797,8 @@ void TWPartition::Setup_Data_Media() {
 			UnMount(true);
 		}
 	}
-	du.add_absolute_dir(Mount_Point + "/media");
+	backup_exclusions.add_absolute_dir(Mount_Point + "/media");
+	wipe_exclusions.add_absolute_dir(Mount_Point + "/media");
 }
 
 void TWPartition::Find_Real_Block_Device(string& Block, bool Display_Error) {
@@ -2153,7 +2158,7 @@ bool TWPartition::Wipe_Data_Without_Wiping_Media_Func(const string& parent __unu
 
 			dir = parent;
 			dir.append(de->d_name);
-			if (du.check_skip_dirs(dir)) {
+			if (wipe_exclusions.check_skip_dirs(dir)) {
 				LOGINFO("skipped '%s'\n", dir.c_str());
 				continue;
 			}
@@ -2208,6 +2213,7 @@ bool TWPartition::Backup_Tar(const string& backup_folder, ProgressTracking *prog
 	Full_FileName = backup_folder + "/" + Backup_FileName;
 	tar.has_data_media = Has_Data_Media;
 	Full_FileName = backup_folder + "/" + Backup_FileName;
+	tar.backup_exclusions = &backup_exclusions;
 	tar.setdir(Backup_Path);
 	tar.setfn(Full_FileName);
 	tar.setsize(Backup_Size);
@@ -2467,7 +2473,7 @@ bool TWPartition::Update_Size(bool Display_Error) {
 
 #ifdef TARGET_RECOVERY_IS_MULTIROM
 	if(!Bind_Of.empty()) {
-		Used = du.Get_Folder_Size(Actual_Block_Device);
+		Used = backup_exclusions.Get_Folder_Size(Actual_Block_Device);
 		Backup_Size = Used;
 	}
 #endif //TARGET_RECOVERY_IS_MULTIROM
@@ -2475,7 +2481,7 @@ bool TWPartition::Update_Size(bool Display_Error) {
 	if (Has_Data_Media) {
 		if (Mount(Display_Error)) {
 			unsigned long long data_media_used, actual_data;
-			Used = du.Get_Folder_Size(Mount_Point);
+			Used = backup_exclusions.Get_Folder_Size(Mount_Point);
 			Backup_Size = Used;
 			int bak = (int)(Used / 1048576LLU);
 			int fre = (int)(Free / 1048576LLU);
@@ -2487,7 +2493,7 @@ bool TWPartition::Update_Size(bool Display_Error) {
 		}
 	} else if (Has_Android_Secure) {
 		if (Mount(Display_Error))
-			Backup_Size = du.Get_Folder_Size(Backup_Path);
+			Backup_Size = backup_exclusions.Get_Folder_Size(Backup_Path);
 		else {
 			if (!Was_Already_Mounted)
 				UnMount(false);

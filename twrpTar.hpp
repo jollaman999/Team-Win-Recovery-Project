@@ -27,7 +27,7 @@ extern "C" {
 #include <fstream>
 #include <string>
 #include <vector>
-#include "twrpDU.hpp"
+#include "exclude.hpp"
 #include "progresstracking.hpp"
 
 using namespace std;
@@ -64,6 +64,7 @@ public:
 	int progress_pipe_fd;
 	string partition_name;
 	string backup_folder;
+	TWExclude *backup_exclusions;
 
 private:
 	int extract();

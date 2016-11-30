@@ -39,7 +39,7 @@
 #include "twrp-functions.hpp"
 #include "fixContexts.hpp"
 #include "twrpDigest.hpp"
-#include "twrpDU.hpp"
+#include "exclude.hpp"
 #include "set_metadata.h"
 #include "tw_atomic.hpp"
 #include "gui/gui.hpp"
@@ -800,7 +800,8 @@ int TWPartitionManager::Run_Backup(void) {
 
 	time(&total_stop);
 	int total_time = (int) difftime(total_stop, total_start);
-	uint64_t actual_backup_size = du.Get_Folder_Size(Full_Backup_Path);
+	TWExclude twe;
+	uint64_t actual_backup_size = twe.Get_Folder_Size(Full_Backup_Path);
 	actual_backup_size /= (1024LLU * 1024LLU);
 
 	int prev_img_bps, use_compression;
