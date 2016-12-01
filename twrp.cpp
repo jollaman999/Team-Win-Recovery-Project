@@ -175,9 +175,9 @@ int main(int argc, char **argv) {
 	}
 
 	if (is_new_file_contexts)
-		file_contexts_path = "/file_contexts.bin"
+		file_contexts_path = "/file_contexts.bin";
 	else if (is_old_file_contexts)
-		file_contexts_path = "/file_contexts"
+		file_contexts_path = "/file_contexts";
 
 	if (is_new_file_contexts || is_old_file_contexts) {
 		struct selinux_opt selinux_options[] = {
