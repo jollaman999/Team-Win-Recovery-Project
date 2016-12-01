@@ -18,38 +18,32 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/types.h>
 #include <sys/system_properties.h>
 
 #include <string>
 #include <vector>
 
+/*
 #include <android-base/file.h>
 #include <android-base/stringprintf.h>
 #include <android-base/unique_fd.h>
+*/
+#ifndef EXCLUDE_FS_MGR
 #include <fs_mgr.h>
+#endif
 
-#include "../common.h"
-
-// fake Volume struct that allows us to use the AOSP code easily
-struct Volume
-{
-    char fs_type[8];
-    char blk_device[256];
-};
-
-static Volume misc;
+static std::string misc_blkdev;
 
 void set_misc_device(const char* type, const char* name) {
-    strlcpy(misc.fs_type, type, sizeof(misc.fs_type));
-    if (strlen(name) >= sizeof(misc.blk_device)) {
-        LOGE("New device name of '%s' is too large for bootloader.cpp\n", name);
-    } else {
-        strcpy(misc.blk_device, name);
-    }
+    misc_blkdev = name;
 }
 
+#ifndef EXCLUDE_FS_MGR
 static struct fstab* read_fstab(std::string* err) {
   // The fstab path is always "/fstab.${ro.hardware}".
   std::string fstab_path = "/fstab.";
@@ -65,9 +59,12 @@ static struct fstab* read_fstab(std::string* err) {
   }
   return fstab;
 }
+#endif
 
 static std::string get_misc_blk_device(std::string* err) {
-#if 0
+#ifdef EXCLUDE_FS_MGR
+  return misc_blkdev;
+#else
   struct fstab* fstab = read_fstab(err);
   if (fstab == nullptr) {
     return "";
@@ -78,15 +75,9 @@ static std::string get_misc_blk_device(std::string* err) {
     return "";
   }
   return record->blk_device;
-#else
-  Volume* v = &misc;
-  if (v->fs_type[0] == 0) {
-    *err = "Not using /misc, not defined in fstab";
-    return "";
-  }
-  return v->blk_device;
 #endif
 }
+
 
 // In recovery mode, recovery can get started and try to access the misc
 // device before the kernel has actually created it.
@@ -99,14 +90,23 @@ static bool wait_for_device(const std::string& blk_device, std::string* err) {
     struct stat buf;
     ret = stat(blk_device.c_str(), &buf);
     if (ret == -1) {
+      char buffer[2048];
+      sprintf(buffer, "failed to stat %s try %d: %s\n",
+                                          blk_device.c_str(), tries, strerror(errno));
+      *err += buffer;
+      /*
       *err += android::base::StringPrintf("failed to stat %s try %d: %s\n",
                                           blk_device.c_str(), tries, strerror(errno));
+      */
       sleep(1);
     }
   } while (ret && tries < 10);
 
   if (ret) {
+    *err += "failed to stat " + blk_device + "\n";
+    /*
     *err += android::base::StringPrintf("failed to stat %s\n", blk_device.c_str());
+    */
   }
   return ret == 0;
 }
@@ -119,22 +119,34 @@ static bool read_misc_partition(void* p, size_t size, size_t offset, std::string
   if (!wait_for_device(misc_blk_device, err)) {
     return false;
   }
-  int fd = open(misc_blk_device.c_str(), O_RDONLY);
-  if (fd == -1) {
+  int fd(open(misc_blk_device.c_str(), O_RDONLY));
+  if (fd < 0) {
+    *err = "failed to open " + misc_blk_device + ": ";
+    *err += strerror(errno);
+    /*
     *err = android::base::StringPrintf("failed to open %s: %s", misc_blk_device.c_str(),
                                        strerror(errno));
+    */
     return false;
   }
   if (lseek(fd, static_cast<off_t>(offset), SEEK_SET) != static_cast<off_t>(offset)) {
+    *err = "failed to lseek " + misc_blk_device + ": ";
+    *err += strerror(errno);
+    close(fd);
+    /*
     *err = android::base::StringPrintf("failed to lseek %s: %s", misc_blk_device.c_str(),
                                        strerror(errno));
-    close(fd);
+    */
     return false;
   }
-  if (!android::base::ReadFully(fd, p, size)) {
+  if (read(fd, p, size) != size) {
+    *err = "failed to read " + misc_blk_device + ": ";
+    *err += strerror(errno);
+    close(fd);
+    /*
     *err = android::base::StringPrintf("failed to read %s: %s", misc_blk_device.c_str(),
                                        strerror(errno));
-    close(fd);
+    */
     return false;
   }
   close(fd);
@@ -144,32 +156,49 @@ static bool read_misc_partition(void* p, size_t size, size_t offset, std::string
 static bool write_misc_partition(const void* p, size_t size, size_t offset, std::string* err) {
   std::string misc_blk_device = get_misc_blk_device(err);
   if (misc_blk_device.empty()) {
+    *err = "no misc device set";
     return false;
   }
-  int fd = open(misc_blk_device.c_str(), O_WRONLY | O_SYNC);
+  int fd = (open(misc_blk_device.c_str(), O_WRONLY | O_SYNC));
   if (fd == -1) {
+    *err = "failed to open " + misc_blk_device + ": ";
+    *err += strerror(errno);
+    /*
     *err = android::base::StringPrintf("failed to open %s: %s", misc_blk_device.c_str(),
                                        strerror(errno));
+    */
     return false;
   }
   if (lseek(fd, static_cast<off_t>(offset), SEEK_SET) != static_cast<off_t>(offset)) {
+    *err = "failed to lseek " + misc_blk_device + ": ";
+    *err += strerror(errno);
+    close(fd);
+    /*
     *err = android::base::StringPrintf("failed to lseek %s: %s", misc_blk_device.c_str(),
                                        strerror(errno));
-    close(fd);
+    */
     return false;
   }
-  if (!android::base::WriteFully(fd, p, size)) {
+  if (write(fd, p, size) != size) {
+    *err = "failed to write " + misc_blk_device + ": ";
+    *err += strerror(errno);
+    close(fd);
+    /*
     *err = android::base::StringPrintf("failed to write %s: %s", misc_blk_device.c_str(),
                                        strerror(errno));
-    close(fd);
+    */
     return false;
   }
 
   // TODO: O_SYNC and fsync duplicates each other?
   if (fsync(fd) == -1) {
+    *err = "failed to fsync " + misc_blk_device + ": ";
+    *err += strerror(errno);
+    close(fd);
+    /*
     *err = android::base::StringPrintf("failed to fsync %s: %s", misc_blk_device.c_str(),
                                        strerror(errno));
-    close(fd);
+    */
     return false;
   }
   close(fd);
@@ -195,7 +224,7 @@ bool write_bootloader_message(const std::vector<std::string>& options, std::stri
   strlcpy(boot.recovery, "recovery\n", sizeof(boot.recovery));
   for (const auto& s : options) {
     strlcat(boot.recovery, s.c_str(), sizeof(boot.recovery));
-    if (s.back() != '\n') {
+    if (s.substr(s.size() - 1) != "\n") {
       strlcat(boot.recovery, "\n", sizeof(boot.recovery));
     }
   }
@@ -214,7 +243,9 @@ bool write_wipe_package(const std::string& package_data, std::string* err) {
 
 extern "C" bool write_bootloader_message(const char* options) {
   std::string err;
-  return write_bootloader_message({options}, &err);
+  bootloader_message boot = {};
+  memcpy(&boot, options, sizeof(boot));
+  return write_bootloader_message(boot, &err);
 }
 
 static const char *COMMAND_FILE = "/cache/recovery/command";
@@ -230,17 +261,18 @@ get_args(int *argc, char ***argv) {
     bootloader_message boot = {};
     std::string err;
     if (!read_bootloader_message(&boot, &err)) {
-        LOGE("%s\n", err.c_str());
+        printf("%s\n", err.c_str());
         // If fails, leave a zeroed bootloader_message.
         memset(&boot, 0, sizeof(boot));
     }
+    //stage = strndup(boot.stage, sizeof(boot.stage));
 
     if (boot.command[0] != 0 && boot.command[0] != 255) {
-        LOGI("Boot command: %.*s\n", (int)sizeof(boot.command), boot.command);
+        printf("Boot command: %.*s\n", (int)sizeof(boot.command), boot.command);
     }
 
     if (boot.status[0] != 0 && boot.status[0] != 255) {
-        LOGI("Boot status: %.*s\n", (int)sizeof(boot.status), boot.status);
+        printf("Boot status: %.*s\n", (int)sizeof(boot.status), boot.status);
     }
 
     // --- if arguments weren't supplied, look in the bootloader control block
@@ -254,14 +286,14 @@ get_args(int *argc, char ***argv) {
                 if ((arg = strtok(NULL, "\n")) == NULL) break;
                 (*argv)[*argc] = strdup(arg);
             }
-            LOGI("Got arguments from boot message\n");
+            printf("Got arguments from boot message\n");
         } else if (boot.recovery[0] != 0 && boot.recovery[0] != 255) {
-            LOGE("Bad boot message\n\"%.20s\"\n", boot.recovery);
+            printf("Bad boot message\n\"%.20s\"\n", boot.recovery);
         }
     }
 
-    // --- if that doesn't work, try the command file
-    if (*argc <= 1) {
+    // --- if that doesn't work, try the command file (if we have /cache).
+    if (*argc <= 1/* && has_cache*/) {
         FILE *fp = fopen(COMMAND_FILE, "r");
         if (fp != NULL) {
             char *token;
@@ -280,10 +312,8 @@ get_args(int *argc, char ***argv) {
                 }
             }
 
-            fflush(fp);
-            if (ferror(fp)) LOGE("Error in %s\n(%s)\n", COMMAND_FILE, strerror(errno));
             fclose(fp);
-            LOGI("Got arguments from %s\n", COMMAND_FILE);
+            printf("Got arguments from %s\n", COMMAND_FILE);
         }
     }
 
@@ -297,6 +327,6 @@ get_args(int *argc, char ***argv) {
         strlcat(boot.recovery, "\n", sizeof(boot.recovery));
     }
     if (!write_bootloader_message(boot, &err)) {
-        LOGE("%s\n", err.c_str());
+        printf("%s\n", err.c_str());
     }
 }

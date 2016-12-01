@@ -14,11 +14,28 @@
 
 LOCAL_PATH := $(call my-dir)
 
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 25; echo $$?),0)
+    include $(CLEAR_VARS)
+    LOCAL_CLANG := true
+    LOCAL_SRC_FILES := bootloader_message.cpp
+    LOCAL_MODULE := libbootloader_message
+    LOCAL_STATIC_LIBRARIES := libfs_mgr
+    LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
+    LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
+    include $(BUILD_STATIC_LIBRARY)
+endif
+
 include $(CLEAR_VARS)
 LOCAL_CLANG := true
 LOCAL_SRC_FILES := bootloader_message.cpp
 LOCAL_MODULE := libbootloader_message
-LOCAL_STATIC_LIBRARIES := libbase libfs_mgr
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
+LOCAL_C_INCLUDES += bionic $(LOCAL_PATH)/include
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -lt 23; echo $$?),0)
+    LOCAL_C_INCLUDES += external/stlport/stlport
+    LOCAL_SHARED_LIBRARIES += libstlport
+else
+    LOCAL_SHARED_LIBRARIES += libc++
+endif
+LOCAL_CFLAGS := -DEXCLUDE_FS_MGR
 LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)/include
-include $(BUILD_STATIC_LIBRARY)
+include $(BUILD_SHARED_LIBRARY)

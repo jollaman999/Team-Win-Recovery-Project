@@ -24,7 +24,7 @@
 #include "gui/twmsg.h"
 
 #include "cutils/properties.h"
-#include "bootloader.h"
+#include "bootloader_message/bootloader_message.h"
 
 #ifdef ANDROID_RB_RESTART
 #include "cutils/android_reboot.h"
@@ -158,25 +158,42 @@ int main(int argc, char **argv) {
 	gui_loadResources();
 
 #ifdef HAVE_SELINUX
+	bool is_new_file_contexts = TWFunc::Path_Exists("/file_contexts.bin");
+	bool is_old_file_contexts = TWFunc::Path_Exists("/file_contexts");
+	string file_contexts_path;
+
 	if (TWFunc::Path_Exists("/prebuilt_file_contexts")) {
-		if (TWFunc::Path_Exists("/file_contexts.bin")) {
+		if (is_new_file_contexts) {
 			printf("Renaming regular /file_contexts.bin -> /file_contexts.bin.bak\n");
 			rename("/file_contexts.bin", "/file_contexts.bin.bak");
-		} else if (TWFunc::Path_Exists("/file_contexts")) {
+			printf("Moving /prebuilt_file_contexts -> /file_contexts.bin\n");
+			rename("/prebuilt_file_contexts", "/file_contexts.bin");
+		} else if (is_old_file_contexts) {
 			printf("Renaming regular /file_contexts -> /file_contexts.bak\n");
 			rename("/file_contexts", "/file_contexts.bak");
+			printf("Moving /prebuilt_file_contexts -> /file_contexts\n");
+			rename("/prebuilt_file_contexts", "/file_contexts");
 		}
-		printf("Moving /prebuilt_file_contexts -> /file_contexts.bin\n");
-		rename("/prebuilt_file_contexts", "/file_contexts.bin");
 	}
-	struct selinux_opt selinux_options[] = {
-		{ SELABEL_OPT_PATH, "/file_contexts.bin" }
-	};
-	selinux_handle = selabel_open(SELABEL_CTX_FILE, selinux_options, 1);
-	if (!selinux_handle)
+
+	if (is_new_file_contexts)
+		file_contexts_path = "/file_contexts.bin"
+	else if (is_old_file_contexts)
+		file_contexts_path = "/file_contexts"
+
+	if (is_new_file_contexts || is_old_file_contexts) {
+		struct selinux_opt selinux_options[] = {
+			{ SELABEL_OPT_PATH, file_contexts_path.c_str() }
+		};
+		selinux_handle = selabel_open(SELABEL_CTX_FILE, selinux_options, 1);
+		if (!selinux_handle)
+			printf("No file contexts for SELinux\n");
+		else
+			printf("SELinux contexts loaded from %s\n", file_contexts_path.c_str());
+	} else {
 		printf("No file contexts for SELinux\n");
-	else
-		printf("SELinux contexts loaded from /file_contexts.bin\n");
+	}
+
 	{ // Check to ensure SELinux can be supported by the kernel
 		char *contexts = NULL;
 
@@ -203,9 +220,8 @@ int main(int argc, char **argv) {
 
 	PartitionManager.Mount_By_Path("/cache", true);
 
-	string Reboot_Value;
-	bool Shutdown = false;
-
+	bool Shutdown = false, Sideload = false;
+	string Send_Intent = "";
 	{
 		TWPartition* misc = PartitionManager.Find_Partition_By_Path("/misc");
 		if (misc != NULL) {
@@ -253,6 +269,7 @@ int main(int argc, char **argv) {
 					if (!OpenRecoveryScript::Insert_ORS_Command("wipe cache\n"))
 						break;
 				}
+				// Other 'w' items are wipe_ab and wipe_package_size which are related to bricking the device remotely. We will not bother to suppor these as having TWRP probably makes "bricking" the device in this manne
 			} else if (*argptr == 'n') {
 				DataManager::SetValue(TW_BACKUP_NAME, gui_parse_text("{@auto_generate}"));
 				if (!OpenRecoveryScript::Insert_ORS_Command("backup BSDCAE\n"))
@@ -260,12 +277,21 @@ int main(int argc, char **argv) {
 			} else if (*argptr == 'p') {
 				Shutdown = true;
 			} else if (*argptr == 's') {
-				ptr = argptr;
-				index2 = 0;
-				while (*ptr != '=' && *ptr != '\n')
-					ptr++;
-				if (*ptr) {
-					Reboot_Value = *ptr;
+				if (strncmp(argptr, "send_intent", strlen("send_intent") == 0)) {
+					ptr = argptr + strlen("send_intent") + 1;
+					Send_Intent = *ptr;
+				} else if (strncmp(argptr, "security", strlen("security") == 0)) {
+					LOGINFO("Security update\n");
+				} else if (strncmp(argptr, "sideload", strlen("sideload") == 0)) {
+					if (!OpenRecoveryScript::Insert_ORS_Command("sideload\n"))
+						break;
+				} else if (strncmp(argptr, "stages", strlen("stages") == 0)) {
+					LOGINFO("ignoring stages command\n");
+				}
+			} else if (*argptr == 'r') {
+				if (strncmp(argptr, "reason", strlen("reason") == 0)) {
+					ptr = argptr + strlen("reason") + 1;
+					gui_print("%s\n", ptr);
 				}
 			}
 		}
@@ -428,7 +454,7 @@ int main(int argc, char **argv) {
 #endif
 
 	// Reboot
-	TWFunc::Update_Intent_File(Reboot_Value);
+	TWFunc::Update_Intent_File(Send_Intent);
 	TWFunc::Update_Log_File();
 	gui_msg(Msg("rebooting=Rebooting..."));
 	string Reboot_Arg;

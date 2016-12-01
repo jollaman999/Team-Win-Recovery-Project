@@ -122,8 +122,8 @@ endif
 LOCAL_STATIC_LIBRARIES :=
 LOCAL_SHARED_LIBRARIES :=
 
-LOCAL_STATIC_LIBRARIES += libguitwrp libbootloader_message
-LOCAL_SHARED_LIBRARIES += libaosprecovery libz libc libcutils libstdc++ libtar libblkid libminuitwrp libminadbd libmtdutils libminzip
+LOCAL_STATIC_LIBRARIES += libguitwrp
+LOCAL_SHARED_LIBRARIES += libaosprecovery libz libc libcutils libstdc++ libtar libblkid libminuitwrp libminadbd libmtdutils libminzip libbootloader_message
 LOCAL_SHARED_LIBRARIES += libcrecovery
 
 #MultiROM

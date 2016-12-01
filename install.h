@@ -18,7 +18,6 @@
 #define RECOVERY_INSTALL_H_
 
 #include <string>
-#include "mincrypt/rsa.h"
 
 #include "common.h"
 #include "minzip/Zip.h"
@@ -30,8 +29,6 @@ enum { INSTALL_SUCCESS, INSTALL_ERROR, INSTALL_CORRUPT, INSTALL_NONE, INSTALL_SK
 // cache partition.
 int install_package(const char* root_path, bool* wipe_cache, const char* install_file,
                     bool needs_mount, int retry_count);
-
-RSAPublicKey* load_keys(const char* filename, int* numKeys);
 
 // Verify the package by ota keys. Return true if the package is verified successfully,
 // otherwise return false.
