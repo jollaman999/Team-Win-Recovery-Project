@@ -606,10 +606,10 @@
 		<variable name="slidervalue_sliderw" value="120" />
 		<variable name="slidervalue_sliderh" value="180" />
 
-		<variable name="pattern_x" value="216" />
-		<variable name="pattern_dot_dia" value="32" />
+		<variable name="pattern_x" value="123" />
+		<variable name="pattern_dot_dia" value="17" />
 		<variable name="pattern_line_w" value="12" />
-		<variable name="pattern_size" value="648" />
+		<variable name="pattern_size" value="834" />
 	</variables>
 
 	<mousecursor>

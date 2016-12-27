@@ -8191,60 +8191,48 @@
 				<placement x="%ab_bc_x%" y="%ab_y%" />
 			</object>
 
-			<object type="text" color="%text_actionbar%">
-				<font resource="title" />
-				<placement x="%col1_x_indent%" y="%row1_2_y%" placement="2" />
-				<text>Decrypt</text>
-			</object>
-
-			<object type="text" color="%text_actionbar%">
-				<font resource="body1" />
-				<placement x="%col1_x_indent%" y="%row1_2_y%" />
-				<text>Data Partition</text>
-			</object>
-
 			<object type="image">
-				<placement x="%col1_x%" y="%row2_2_y%" />
+				<placement x="%col1_x%" y="%row1_1_y%" />
 				<image resource="icon_info" />
 			</object>
 
-			<object type="text" color="%text_highlight%">
+			<object type="text" color="%text_actionbar%">
 				<font resource="body2" />
-				<placement x="%col1_x_indent%" y="%row2_2_y%" />
+				<placement x="%col1_x_indent%" y="%row1_1_y%" />
 				<text>Data Partition is encrypted.</text>
 			</object>
 
 			<object type="text" color="%text%">
 				<condition var1="tw_password_fail" op="!=" var2="1" />
 				<font resource="body2" />
-				<placement x="%col1_x_indent%" y="%row3_1_y%" />
+				<placement x="%col1_x_indent%" y="%row2_1a_y%" />
 				<text>Please enter the pattern or</text>
 			</object>
 
 			<object type="text" color="%text%">
 				<condition var1="tw_password_fail" op="!=" var2="1" />
 				<font resource="body2" />
-				<placement x="%col1_x_indent%" y="%row3_2_y%" />
+				<placement x="%col1_x_indent%" y="%row2_2a_y%" />
 				<text>press the back button to cancel.</text>
 			</object>
 
 			<object type="text" color="%text_fail%">
 				<condition var1="tw_password_fail" var2="1" />
 				<font resource="body2" />
-				<placement x="%col1_x_indent%" y="%row3_1_y%" />
+				<placement x="%col1_x_indent%" y="%row2_1a_y%" />
 				<text>Wrong pattern!</text>
 			</object>
 
 			<object type="text" color="%text%">
 				<condition var1="tw_password_fail" var2="1" />
 				<font resource="body2" />
-				<placement x="%col1_x_indent%" y="%row3_2_y%" />
+				<placement x="%col1_x_indent%" y="%row2_2a_y%" />
 				<text>Please try again.</text>
 			</object>
 
 			<object type="patternpassword">
 				<size name="tw_gui_pattern_grid_size" default="3"/>
-				<placement x="%pattern_x%" y="%row4_1a_y%" w="%pattern_size%" h="%pattern_size%" />
+				<placement x="%pattern_x%" y="%row3_1a_y%" w="%pattern_size%" h="%pattern_size%" />
 				<dot color="%text_dark%" activecolor="%highlight%" radius="%pattern_dot_dia%" />
 				<line color="%text_dark%" width="%pattern_line_w%" />
 				<data name="tw_crypto_password" />
