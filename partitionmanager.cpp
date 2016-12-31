@@ -577,10 +577,10 @@ bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backu
 			for (subpart = Partitions.begin(); subpart != Partitions.end(); subpart++) {
 				if ((*subpart)->Can_Be_Backed_Up && (*subpart)->Is_SubPartition && (*subpart)->SubPartition_Of == Part->Mount_Point) {
 					if (!(*subpart)->Backup(Backup_Folder, tar_fork_pid, progress)) {
-						TWFunc::SetPerformanceMode(false);
 						Clean_Backup_Folder(Backup_Folder);
 						TWFunc::copy_file("/tmp/recovery.log", backup_log, 0644);
 						tw_set_default_metadata(backup_log.c_str());
+						TWFunc::SetPerformanceMode(false);
 						return false;
 					}
 					sync();
