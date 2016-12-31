@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
 		printf("\n");
 	}
 
-	if(crash_counter == 0) {
+	if (crash_counter == 0) {
 		property_list(Print_Prop, NULL);
 		printf("\n");
 	} else {
@@ -356,7 +356,7 @@ int main(int argc, char **argv) {
 #endif //TARGET_RECOVERY_IS_MULTIROM
 
 	// Fixup the RTC clock on devices which require it
-	if(crash_counter == 0)
+	if (crash_counter == 0)
 		TWFunc::Fixup_Time_On_Boot();
 
 	// Run any outstanding OpenRecoveryScript

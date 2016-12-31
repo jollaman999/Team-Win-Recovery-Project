@@ -941,7 +941,7 @@ int twrpTar::createTar() {
 				fd = pipes[1];
 				init_libtar_no_buffer(progress_pipe_fd);
 				tar_type.writefunc = write_tar_no_buffer;
-				if(tar_fdopen(&t, fd, charRootDir, &tar_type, O_WRONLY | O_CREAT | O_EXCL | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
+				if (tar_fdopen(&t, fd, charRootDir, &tar_type, O_WRONLY | O_CREAT | O_EXCL | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
 					close(fd);
 					LOGINFO("tar_fdopen failed\n");
 					gui_err("backup_error=Error creating backup.");
@@ -995,7 +995,7 @@ int twrpTar::createTar() {
 			fd = pigzfd[1];   // copy parent output
 			init_libtar_no_buffer(progress_pipe_fd);
 			tar_type.writefunc = write_tar_no_buffer;
-			if(tar_fdopen(&t, fd, charRootDir, &tar_type, O_WRONLY | O_CREAT | O_EXCL | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
+			if (tar_fdopen(&t, fd, charRootDir, &tar_type, O_WRONLY | O_CREAT | O_EXCL | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
 				close(fd);
 				LOGINFO("tar_fdopen failed\n");
 				gui_err("backup_error=Error creating backup.");
@@ -1045,7 +1045,7 @@ int twrpTar::createTar() {
 			fd = oaesfd[1];   // copy parent output
 			init_libtar_no_buffer(progress_pipe_fd);
 			tar_type.writefunc = write_tar_no_buffer;
-			if(tar_fdopen(&t, fd, charRootDir, &tar_type, O_WRONLY | O_CREAT | O_EXCL | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
+			if (tar_fdopen(&t, fd, charRootDir, &tar_type, O_WRONLY | O_CREAT | O_EXCL | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
 				close(fd);
 				LOGINFO("tar_fdopen failed\n");
 				gui_err("backup_error=Error creating backup.");
@@ -1152,7 +1152,7 @@ int twrpTar::openTar() {
 				close(pipes[1]);
 				close(pipes[3]);
 				fd = pipes[2];
-				if(tar_fdopen(&t, fd, charRootDir, NULL, O_RDONLY | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
+				if (tar_fdopen(&t, fd, charRootDir, NULL, O_RDONLY | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
 					close(fd);
 					LOGINFO("tar_fdopen failed\n");
 					gui_err("restore_error=Error during restore process.");
@@ -1201,7 +1201,7 @@ int twrpTar::openTar() {
 			// Parent
 			close(oaesfd[1]); // close parent output
 			fd = oaesfd[0];   // copy parent input
-			if(tar_fdopen(&t, fd, charRootDir, NULL, O_RDONLY | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
+			if (tar_fdopen(&t, fd, charRootDir, NULL, O_RDONLY | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) != 0) {
 				close(fd);
 				LOGINFO("tar_fdopen failed\n");
 				gui_err("restore_error=Error during restore process.");
@@ -1435,7 +1435,7 @@ unsigned long long twrpTar::uncompressedSize(string filename, int *archive_type)
 			*/
 			split = TWFunc::split_string(result, ' ', true);
 			if (split.size() > 4)
-			total_size = atoi(split[5].c_str());
+				total_size = atoi(split[5].c_str());
 		}
 		*archive_type = 1;
 	} else if (type == 2) {
@@ -1464,7 +1464,7 @@ unsigned long long twrpTar::uncompressedSize(string filename, int *archive_type)
 				*/
 				split = TWFunc::split_string(result, ' ', true);
 				if (split.size() > 4)
-				total_size = atoi(split[5].c_str());
+					total_size = atoi(split[5].c_str());
 			}
 		} else {
 			total_size = TWFunc::Get_File_Size(filename);
