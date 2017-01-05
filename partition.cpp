@@ -55,7 +55,7 @@ extern "C" {
 #endif
 
 #ifdef TW_INCLUDE_CRYPTO
-	#include "crypto/lollipop/cryptfs.h"
+	#include "crypto/cryptfs/cryptfs.h"
 	#include "gpt/gpt.h"
 	#ifdef TW_INCLUDE_FBE
 		#include "crypto/ext4crypt/Decrypt.h"
@@ -1863,7 +1863,7 @@ bool TWPartition::Wipe_Encryption() {
 	if (Is_Decrypted && !Decrypted_Block_Device.empty()) {
 		if (!UnMount(true))
 			return false;
-		if (delete_crypto_blk_dev((char*)("userdata")) != 0) {
+		if (cryptfs_revert_ext_volume((const char*)("userdata")) != 0) {
 			LOGERR("Error deleting crypto block device, continuing anyway.\n");
 		}
 	}

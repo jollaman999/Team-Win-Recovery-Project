@@ -315,7 +315,7 @@ ifeq ($(TW_INCLUDE_L_CRYPTO), true)
 endif
 ifeq ($(TW_INCLUDE_CRYPTO), true)
     LOCAL_CFLAGS += -DTW_INCLUDE_CRYPTO
-    LOCAL_SHARED_LIBRARIES += libcryptfslollipop libgpt_twrp
+    LOCAL_SHARED_LIBRARIES += libcryptfs libgpt_twrp
     LOCAL_C_INCLUDES += external/boringssl/src/include
     ifeq ($(shell test $(PLATFORM_SDK_VERSION) -ge 24; echo $$?),0)
         TW_INCLUDE_CRYPTO_FBE := true
@@ -802,7 +802,7 @@ ifeq ($(shell test $(PLATFORM_SDK_VERSION) -lt 24; echo $$?),0)
 endif
 
 ifeq ($(TW_INCLUDE_CRYPTO), true)
-    include $(commands_recovery_local_path)/crypto/lollipop/Android.mk
+    include $(commands_recovery_local_path)/crypto/cryptfs/Android.mk
     include $(commands_recovery_local_path)/crypto/scrypt/Android.mk
     ifeq ($(TW_INCLUDE_CRYPTO_FBE), true)
         include $(commands_recovery_local_path)/crypto/ext4crypt/Android.mk
