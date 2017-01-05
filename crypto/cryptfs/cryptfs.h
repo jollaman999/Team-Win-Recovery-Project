@@ -26,8 +26,8 @@
  * partition.
  */
 
+#include <stdbool.h>
 #include <cutils/properties.h>
-#include "openssl/sha.h"
 
 /* The current cryptfs version */
 #define CURRENT_MAJOR_VERSION 1
@@ -52,6 +52,16 @@
                                         correctly marked partial encryption */
 #define CRYPT_DATA_CORRUPT 0x8 /* Set when encryption is fine, but the
                                   underlying volume is corrupt */
+#define CRYPT_FORCE_ENCRYPTION 0x10 /* Set when it is time to encrypt this
+                                       volume on boot. Everything in this
+                                       structure is set up correctly as
+                                       though device is encrypted except
+                                       that the master key is encrypted with the
+                                       default password. */
+#define CRYPT_FORCE_COMPLETE 0x20 /* Set when the above encryption cycle is
+                                     complete. On next cryptkeeper entry, match
+                                     the password. If it matches fix the master
+                                     key and remove this flag. */
 #ifdef CONFIG_HW_DISK_ENCRYPTION
 /* This flag is used to transition from L->M upgrade. L release passed
  * a byte for every nible of user password while M release is passing
@@ -60,6 +70,7 @@
  */
 #define CRYPT_ASCII_PASSWORD_UPDATED 0x1000
 #endif
+
 /* Allowed values for type in the structure below */
 #define CRYPT_TYPE_PASSWORD 0 /* master_key is encrypted with a password
                                * Must be zero to be compatible with pre-L
@@ -73,16 +84,10 @@
 #define CRYPT_MNT_MAGIC 0xD0B5B1C4
 #define PERSIST_DATA_MAGIC 0xE950CD44
 
-#define SCRYPT_PROP "ro.crypto.scrypt_params"
-#define SCRYPT_DEFAULTS { 15, 3, 1 }
-
 /* Key Derivation Function algorithms */
 #define KDF_PBKDF2 1
 #define KDF_SCRYPT 2
-/* TODO(paullawrence): Remove KDF_SCRYPT_KEYMASTER_UNPADDED and KDF_SCRYPT_KEYMASTER_BADLY_PADDED
- * when it is safe to do so. */
-#define KDF_SCRYPT_KEYMASTER_UNPADDED 3
-#define KDF_SCRYPT_KEYMASTER_BADLY_PADDED 4
+/* Algorithms 3 & 4 deprecated before shipping outside of google, so removed */
 #define KDF_SCRYPT_KEYMASTER 5
 
 /* Maximum allowed keymaster blob size. */
@@ -90,6 +95,10 @@
 
 /* __le32 and __le16 defined in system/extras/ext4_utils/ext4_utils.h */
 #define __le8  unsigned char
+
+#if !defined(SHA256_DIGEST_LENGTH)
+#define SHA256_DIGEST_LENGTH 32
+#endif
 
 struct crypt_mnt_ftr {
   __le32 magic;         /* See above */
@@ -100,7 +109,7 @@ struct crypt_mnt_ftr {
   __le32 keysize;       /* in bytes */
   __le32 crypt_type;    /* how master_key is encrypted. Must be a
                          * CRYPT_TYPE_XXX value */
-  __le64 fs_size;	/* Size of the encrypted fs, in 512 byte sectors */
+  __le64 fs_size;       /* Size of the encrypted fs, in 512 byte sectors */
   __le32 failed_decrypt_count; /* count of # of failed attempts to decrypt and
                                   mount, set to 0 on successful mount */
   unsigned char crypto_type_name[MAX_CRYPTO_TYPE_NAME_LEN]; /* The type of encryption
@@ -151,6 +160,12 @@ struct crypt_mnt_ftr {
      then we will be OK.
    */
   unsigned char scrypted_intermediate_key[SCRYPT_LEN];
+
+  /* sha of this structure with this element set to zero
+     Used when encrypting on reboot to validate structure before doing something
+     fatal
+   */
+  unsigned char sha256[SHA256_DIGEST_LENGTH];
 };
 
 /* Persistant data that should be available before decryption.
@@ -179,34 +194,40 @@ struct crypt_persist_data {
   struct crypt_persist_entry persist_entry[0];
 };
 
-struct volume_info {
-   unsigned int size;
-   unsigned int flags;
-   struct crypt_mnt_ftr crypt_ftr;
-   char mnt_point[256];
-   char blk_dev[256];
-   char crypto_blkdev[256];
-   char label[256];
-};
-#define VOL_NONREMOVABLE   0x1
-#define VOL_ENCRYPTABLE    0x2
-#define VOL_PRIMARY        0x4
-#define VOL_PROVIDES_ASEC  0x8
-
 #define DATA_MNT_POINT "/data"
 
 /* Return values for cryptfs_crypto_complete */
-#define CRYPTO_COMPLETE_NOT_ENCRYPTED  1
-#define CRYPTO_COMPLETE_ENCRYPTED      0
-#define CRYPTO_COMPLETE_BAD_METADATA  -1
-#define CRYPTO_COMPLETE_PARTIAL       -2
-#define CRYPTO_COMPLETE_INCONSISTENT  -3
-#define CRYPTO_COMPLETE_CORRUPT       -4
+#define CRYPTO_COMPLETE_ENCRYPTED_MDTP_ACTIVATED   2
+#define CRYPTO_COMPLETE_NOT_ENCRYPTED              1
+#define CRYPTO_COMPLETE_ENCRYPTED                  0
+#define CRYPTO_COMPLETE_BAD_METADATA              -1
+#define CRYPTO_COMPLETE_PARTIAL                   -2
+#define CRYPTO_COMPLETE_INCONSISTENT              -3
+#define CRYPTO_COMPLETE_CORRUPT                   -4
+#define CRYPTO_COMPLETE_ERROR_MDTP_ACTIVATED      -5
+
 
 /* Return values for cryptfs_enable_inplace*() */
 #define ENABLE_INPLACE_OK 0
 #define ENABLE_INPLACE_ERR_OTHER -1
 #define ENABLE_INPLACE_ERR_DEV -2  /* crypto_blkdev issue */
+
+/* Return values for cryptfs_getfield */
+#define CRYPTO_GETFIELD_OK                   0
+#define CRYPTO_GETFIELD_ERROR_NO_FIELD      -1
+#define CRYPTO_GETFIELD_ERROR_OTHER         -2
+#define CRYPTO_GETFIELD_ERROR_BUF_TOO_SMALL -3
+
+/* Return values for cryptfs_setfield */
+#define CRYPTO_SETFIELD_OK                    0
+#define CRYPTO_SETFIELD_ERROR_OTHER          -1
+#define CRYPTO_SETFIELD_ERROR_FIELD_TOO_LONG -2
+#define CRYPTO_SETFIELD_ERROR_VALUE_TOO_LONG -3
+
+/* Return values for persist_del_key */
+#define PERSIST_DEL_KEY_OK                 0
+#define PERSIST_DEL_KEY_ERROR_OTHER       -1
+#define PERSIST_DEL_KEY_ERROR_NO_FIELD    -2
 
 #ifdef __cplusplus
 extern "C" {
@@ -219,11 +240,12 @@ extern "C" {
   int cryptfs_check_footer();
   int cryptfs_check_passwd(char *pw);
   int cryptfs_verify_passwd(char *newpw);
-  int cryptfs_get_password_type(void);
-  int delete_crypto_blk_dev(char *name);
   int cryptfs_setup_ext_volume(const char* label, const char* real_blkdev,
           const unsigned char* key, int keysize, char* out_crypto_blkdev);
   int cryptfs_revert_ext_volume(const char* label);
+  int cryptfs_get_password_type(void);
+  void cryptfs_clear_password(void);
+
 #ifdef __cplusplus
 }
 #endif
