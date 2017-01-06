@@ -84,13 +84,13 @@ int OpenRecoveryScript::copy_script_file(string filename) {
 }
 
 int OpenRecoveryScript::run_script_file(void) {
-	FILE *fp = fopen(SCRIPT_FILE_TMP, "r");
 	int ret_val = 0, cindex, line_len, i, remove_nl, install_cmd = 0, sideload = 0;
 	char script_line[SCRIPT_COMMAND_SIZE], command[SCRIPT_COMMAND_SIZE],
 	     value[SCRIPT_COMMAND_SIZE], mount[SCRIPT_COMMAND_SIZE],
 	     value1[SCRIPT_COMMAND_SIZE], value2[SCRIPT_COMMAND_SIZE];
 	char *val_start, *tok;
 
+	FILE *fp = fopen(SCRIPT_FILE_TMP, "r");
 	if (fp != NULL) {
 		DataManager::SetValue(TW_SIMULATE_ACTIONS, 0);
 		DataManager::SetValue("ui_progress", 0); // Reset the progress bar
