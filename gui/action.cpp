@@ -67,7 +67,6 @@ GUIAction::mapFunc GUIAction::mf;
 std::set<string> GUIAction::setActionsRunningInCallerThread;
 static string zip_queue[10];
 static int zip_queue_index;
-static pthread_t terminal_command;
 pid_t sideload_child_pid;
 
 static void *ActionThread_work_wrapper(void *data);
@@ -884,7 +883,6 @@ int GUIAction::checkpartitionlist(std::string arg)
 int GUIAction::getpartitiondetails(std::string arg)
 {
 	string List, part_path;
-	int count = 0;
 
 	if (arg.empty())
 		arg = "tw_wipe_list";
@@ -1114,7 +1112,7 @@ int GUIAction::wipe(std::string arg)
 		else if (arg == "DATAMEDIA") {
 			ret_val = PartitionManager.Format_Data();
 		} else if (arg == "INTERNAL") {
-			int has_datamedia, dual_storage;
+			int has_datamedia;
 
 			DataManager::GetValue(TW_HAS_DATA_MEDIA, has_datamedia);
 			if (has_datamedia) {
@@ -1133,7 +1131,6 @@ int GUIAction::wipe(std::string arg)
 			string Wipe_List, wipe_path;
 			bool skip = false;
 			ret_val = true;
-			TWPartition* wipe_part = NULL;
 
 			DataManager::GetValue("tw_wipe_list", Wipe_List);
 			LOGINFO("wipe list '%s'\n", Wipe_List.c_str());
@@ -1421,7 +1418,7 @@ int GUIAction::terminalcommand(std::string arg)
 		if (fp == NULL) {
 			LOGERR("Error opening command to run (%s).\n", strerror(errno));
 		} else {
-			int fd = fileno(fp), has_data = 0, check = 0, keep_going = -1, bytes_read = 0;
+			int fd = fileno(fp), has_data = 0, check = 0, keep_going = -1;
 			struct timeval timeout;
 			fd_set fdset;
 
@@ -1462,8 +1459,6 @@ int GUIAction::terminalcommand(std::string arg)
 
 int GUIAction::killterminal(std::string arg __unused)
 {
-	int op_status = 0;
-
 	LOGINFO("Sending kill command...\n");
 	operation_start("KillCommand");
 	DataManager::SetValue("tw_operation_status", 0);

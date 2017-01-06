@@ -218,7 +218,7 @@ int main(int argc, char **argv) {
 
 	PartitionManager.Mount_By_Path("/cache", true);
 
-	bool Shutdown = false, Sideload = false;
+	bool Shutdown = false;
 	string Send_Intent = "";
 	{
 		TWPartition* misc = PartitionManager.Find_Partition_By_Path("/misc");
