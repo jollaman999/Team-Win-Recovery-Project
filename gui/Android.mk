@@ -79,7 +79,11 @@ ifeq ($(TARGET_RECOVERY_IS_MULTIROM), true)
     LOCAL_CFLAGS += -DTARGET_RECOVERY_IS_MULTIROM
 endif
 
-LOCAL_C_INCLUDES += bionic system/core/libpixelflinger/include
+LOCAL_C_INCLUDES += \
+    bionic \
+    system/core/include \
+    system/core/libpixelflinger/include
+
 ifeq ($(shell test $(PLATFORM_SDK_VERSION) -lt 23; echo $$?),0)
     LOCAL_C_INCLUDES += external/stlport/stlport
 endif
