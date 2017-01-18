@@ -53,10 +53,8 @@ extern "C" {
 }
 #endif
 
-#ifdef HAVE_SELINUX
-#include "selinux/label.h"
+#include <selinux/label.h>
 struct selabel_handle *selinux_handle;
-#endif
 
 #ifdef TARGET_RECOVERY_IS_MULTIROM
 #include "multirom/multirom.h"
@@ -155,7 +153,6 @@ int main(int argc, char **argv) {
 	// Load up all the resources
 	gui_loadResources();
 
-#ifdef HAVE_SELINUX
 	bool is_new_file_contexts = TWFunc::Path_Exists("/file_contexts.bin");
 	bool is_old_file_contexts = TWFunc::Path_Exists("/file_contexts");
 	string file_contexts_path;
@@ -212,9 +209,6 @@ int main(int argc, char **argv) {
 			gui_msg("full_selinux=Full SELinux support is present.");
 		}
 	}
-#else
-	gui_warn("no_selinux=No SELinux support (no libselinux).");
-#endif
 
 	PartitionManager.Mount_By_Path("/cache", true);
 
