@@ -402,7 +402,6 @@ protected:
 	int system_image_upgrader(std::string arg);
 #endif //TARGET_RECOVERY_IS_MULTIROM
 	int setlanguage(std::string arg);
-	int togglebacklight(std::string arg);
 	int twcmd(std::string arg);
 
 	int simulate;
