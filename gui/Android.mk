@@ -112,13 +112,6 @@ ifeq ($(TARGET_RECOVERY_IS_MULTIROM),true)
 endif
 endif
 
-TWRP_RES := $(commands_recovery_local_path)/gui/theme/common/fonts
-TWRP_RES += $(commands_recovery_local_path)/gui/theme/common/languages
-ifeq ($(TW_EXTRA_LANGUAGES),true)
-    TWRP_RES += $(commands_recovery_local_path)/gui/theme/extra-languages/fonts
-    TWRP_RES += $(commands_recovery_local_path)/gui/theme/extra-languages/languages
-endif
-
 ifeq ($(TW_CUSTOM_THEME),)
     ifeq ($(TW_THEME),)
         ifeq ($(DEVICE_RESOLUTION),)
@@ -144,23 +137,20 @@ ifeq ($(TW_CUSTOM_THEME),)
     endif
 ifeq ($(TWRP_NEW_THEME),true)
     TWRP_THEME_LOC := $(commands_recovery_local_path)/gui/theme/$(TW_THEME)
+    TWRP_RES := $(commands_recovery_local_path)/gui/theme/common/fonts
+    TWRP_RES += $(commands_recovery_local_path)/gui/theme/common/languages
     TWRP_RES += $(commands_recovery_local_path)/gui/theme/common/$(word 1,$(subst _, ,$(TW_THEME))).xml
-    # for future copying of used include xmls and fonts:
-    # UI_XML := $(TWRP_THEME_LOC)/ui.xml
-    # TWRP_INCLUDE_XMLS := $(shell xmllint --xpath '/recovery/include/xmlfile/@name' $(UI_XML)|sed -n 's/[^\"]*\"\([^\"]*\)\"[^\"]*/\1\n/gp'|sort|uniq)
-    # TWRP_FONTS_TTF := $(shell xmllint --xpath '/recovery/resources/font/@filename' $(UI_XML)|sed -n 's/[^\"]*\"\([^\"]*\)\"[^\"]*/\1\n/gp'|sort|uniq)niq)
-else
-    TWRP_THEME_LOC := $(TW_CUSTOM_THEME)
+ifeq ($(TW_EXTRA_LANGUAGES),true)
+    TWRP_RES += $(commands_recovery_local_path)/gui/theme/extra-languages/fonts
+    TWRP_RES += $(commands_recovery_local_path)/gui/theme/extra-languages/languages
 endif
-TWRP_RES += $(TW_ADDITIONAL_RES)
-
+# for future copying of used include xmls and fonts:
+# UI_XML := $(TWRP_THEME_LOC)/ui.xml
+# TWRP_INCLUDE_XMLS := $(shell xmllint --xpath '/recovery/include/xmlfile/@name' $(UI_XML)|sed -n 's/[^\"]*\"\([^\"]*\)\"[^\"]*/\1\n/gp'|sort|uniq)
+# TWRP_FONTS_TTF := $(shell xmllint --xpath '/recovery/resources/font/@filename' $(UI_XML)|sed -n 's/[^\"]*\"\([^\"]*\)\"[^\"]*/\1\n/gp'|sort|uniq)niq)
 ifeq ($(wildcard $(TWRP_THEME_LOC)/ui.xml),)
     $(warning ****************************************************************************)
-    ifeq ($(TW_CUSTOM_THEME),)
-        $(warning * TW_THEME is not valid: '$(TW_THEME)')
-    else
-        $(warning * TW_CUSTOM_THEME is not valid: '$(TW_CUSTOM_THEME)')
-    endif
+    $(warning * TW_THEME is not valid: '$(TW_THEME)')
     $(warning * Please choose an appropriate TW_THEME or create a new one for your device.)
     $(warning * Available themes:)
     $(warning * $(notdir $(wildcard $(commands_recovery_local_path)/gui/theme/*_*)))
@@ -189,6 +179,10 @@ else
         $(error stopping)
     endif
 endif
+else
+    TWRP_THEME_LOC := $(TW_CUSTOM_THEME)
+endif
+TWRP_RES += $(TW_ADDITIONAL_RES)
 
 TWRP_RES_GEN := $(intermediates)/twrp
 $(TWRP_RES_GEN):
