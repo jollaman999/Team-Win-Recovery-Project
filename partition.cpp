@@ -2251,8 +2251,8 @@ bool TWPartition::Backup_Tar(const string& backup_folder, ProgressTracking *prog
 
 	Backup_FileName = Backup_Name + "." + Current_File_System + ".win";
 	Full_FileName = backup_folder + "/" + Backup_FileName;
-	tar.has_data_media = Has_Data_Media;
-	Full_FileName = backup_folder + "/" + Backup_FileName;
+	if (Has_Data_Media)
+		gui_msg(Msg(msg::kWarning, "backup_storage_warning=Backups of {1} do not include any files in internal storage such as pictures or downloads.")(Display_Name));
 	tar.backup_exclusions = &backup_exclusions;
 	tar.setdir(Backup_Path);
 	tar.setfn(Full_FileName);
