@@ -728,7 +728,8 @@ include $(commands_recovery_local_path)/injecttwrp/Android.mk \
     $(commands_recovery_local_path)/etc/Android.mk \
     $(commands_recovery_local_path)/toybox/Android.mk \
     $(commands_recovery_local_path)/simg2img/Android.mk \
-    $(commands_recovery_local_path)/libpixelflinger/Android.mk
+    $(commands_recovery_local_path)/libpixelflinger/Android.mk \
+    $(commands_recovery_local_path)/attr/Android.mk
 
 #MultiROM
 ifeq ($(TARGET_RECOVERY_IS_MULTIROM), true)
