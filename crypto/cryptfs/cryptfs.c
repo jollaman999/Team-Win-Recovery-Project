@@ -433,13 +433,13 @@ static void ioctl_init(struct dm_ioctl *io, size_t dataSize, const char *name, u
 
 static unsigned int get_blkdev_size(int fd)
 {
-  unsigned int nr_sec;
+  unsigned long nr_sec;
 
   if ( (ioctl(fd, BLKGETSIZE, &nr_sec)) == -1) {
     nr_sec = 0;
   }
 
-  return nr_sec;
+  return (unsigned int) nr_sec;
 }
 
 static int get_crypt_ftr_info(char **metadata_fname, off64_t *off)
