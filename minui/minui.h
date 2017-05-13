@@ -23,6 +23,8 @@
 
 #include <functional>
 
+#define TW_USE_MINUI_CUSTOM_FONTS 1 // Force use minui custom fonts
+
 //
 // Graphics.
 //

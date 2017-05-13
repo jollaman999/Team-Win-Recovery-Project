@@ -40,6 +40,8 @@
 #include "minui.h"
 #include "graphics.h"
 
+#define TW_USE_MINUI_CUSTOM_FONTS 1 // Force use minui custom fonts
+
 static GRFont* gr_font = NULL;
 static minui_backend* gr_backend = NULL;
 
