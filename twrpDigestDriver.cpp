@@ -170,11 +170,11 @@ bool twrpDigestDriver::Write_Digest(string Full_Filename) {
 	return true;
 }
 
-bool twrpDigestDriver::Make_Digest(bool generate_md5, string Backup_Folder, string Backup_Filename) {
+bool twrpDigestDriver::Make_Digest(bool generate_digest, string Backup_Folder, string Backup_Filename) {
 	string command, result;
 	string Full_Filename = Backup_Folder + Backup_Filename;
 
-	if (!generate_md5)
+	if (!generate_digest)
 		return true;
 
 	TWFunc::GUI_Operation_Text(TW_GENERATE_DIGEST_TEXT, gui_parse_text("{@generating_digest1}"));
