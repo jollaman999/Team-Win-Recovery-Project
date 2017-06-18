@@ -40,29 +40,35 @@ bool twrpDigestDriver::Check_Restore_File_Digest(const string& Filename) {
 	bool use_sha2 = false;
 
 #ifndef TW_NO_SHA2_LIBRARY
-
-	digestfile += ".sha2";
-	if (TWFunc::Path_Exists(digestfile)) {
+	if (TWFunc::Path_Exists(Filename + ".sha2")) {
 		digest = new twrpSHA256();
 		use_sha2 = true;
+		digestfile += ".sha2";
 	}
-	else {
+	else if (TWFunc::Path_Exists(Filename + ".sha256sum")) {
+		digest = new twrpSHA256();
+		use_sha2 = true;
+		digestfile += ".sha256sum";
+	}
+	else if (TWFunc::Path_Exists(Filename + ".md5")) {
 		digest = new twrpMD5();
-		digestfile = Filename + ".md5";
-
+		digestfile += ".md5";
+	}
+	else if (TWFunc::Path_Exists(Filename + ".md5sum")) {
+		digest = new twrpMD5();
+		digestfile += ".md5sum";
 	}
 #else
-	digest = new twrpMD5();
-	digestfile = Filename + ".md5";
-
+	if (TWFunc::Path_Exists(Filename + ".md5sum")) {
+		digest = new twrpMD5();
+		digestfile += ".md5sum";
+	}
 #endif
-
-	if (!TWFunc::Path_Exists(digestfile)) {
+	else {
 		gui_msg(Msg(msg::kError, "no_digest_found=No digest file found for '{1}'. Please unselect Enable Digest verification to restore.")(Filename));
 		delete digest;
 		return false;
 	}
-
 
 	if (TWFunc::read_file(digestfile, digest_str) != 0) {
 		gui_msg("digest_error=Digest Error!");
