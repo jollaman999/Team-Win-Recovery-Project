@@ -2637,8 +2637,8 @@
 			<object type="checkbox">
 				<placement x="%col1_x%" y="%row4_3a_y%" />
 				<font resource="body2" color="%text%" />
-				<text>Force MD5 check on all Zip files</text>
-				<data variable="tw_force_md5_check" />
+				<text>Force Digest check on all Zip files</text>
+				<data variable="tw_force_digest_check" />
 				<image checked="checkbox_true" unchecked="checkbox_false" />
 			</object>
 

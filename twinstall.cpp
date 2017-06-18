@@ -43,6 +43,7 @@
 #include "twrpDigestDriver.hpp"
 #include "twrpDigest/twrpDigest.hpp"
 #include "twrpDigest/twrpMD5.hpp"
+#include "twrpDigest/twrpSHA.hpp"
 #include "twrp-functions.hpp"
 #include "gui/gui.hpp"
 #include "gui/pages.hpp"
@@ -295,6 +296,7 @@ static int Run_Update_Binary(const char *path, ZipArchive *Zip, int* wipe_cache)
 extern "C" int TWinstall_zip(const char* path, int* wipe_cache) {
 	int ret_val, zip_verify = 1;
 	ZipArchive Zip;
+	bool no_digest = false;
 
 	if (strcmp(path, "error") == 0) {
 		LOGERR("Failed to get adb sideload file: '%s'\n", path);
@@ -306,18 +308,48 @@ extern "C" int TWinstall_zip(const char* path, int* wipe_cache) {
 		string digest_str;
 		string Full_Filename = path;
 		string digest_file = path;
-		digest_file += ".md5";
+		bool use_sha2 = false;
 
 		gui_msg("check_for_digest=Checking for Digest file...");
-		if (!TWFunc::Path_Exists(digest_file)) {
+
+#ifndef TW_NO_SHA2_LIBRARY
+		if (TWFunc::Path_Exists((string)path + ".sha2")) {
+			use_sha2 = true;
+			digest_file += ".sha2";
+		}
+		else if (TWFunc::Path_Exists((string)path + ".sha256sum")) {
+			use_sha2 = true;
+			digest_file += ".sha256sum";
+		}
+		else if (TWFunc::Path_Exists((string)path + ".md5")) {
+			digest_file += ".md5";
+		}
+		else if (TWFunc::Path_Exists((string)path + ".md5sum")) {
+			digest_file += ".md5sum";
+		}
+#else
+		if (TWFunc::Path_Exists((string)path + ".md5sum")) {
+			digest_file += ".md5sum";
+		}
+#endif
+		else {
+			no_digest = true;
+		}
+
+		if (no_digest) {
 			gui_msg("no_digest=Skipping Digest check: no Digest file found");
 		}
 		else {
 			if (TWFunc::read_file(digest_file, digest_str) != 0) {
-				LOGERR("Skipping MD5 check: MD5 file unreadable\n");
+				LOGERR("Skipping Digest check: Digest file unreadable\n");
 			}
 			else {
-				twrpDigest *digest = new twrpMD5();
+				twrpDigest *digest;
+
+				if (use_sha2)
+					digest = new twrpSHA256();
+				else
+					digest = new twrpMD5();
 				if (!twrpDigestDriver::stream_file_to_digest(Full_Filename, digest)) {
 					delete digest;
 					return INSTALL_CORRUPT;
