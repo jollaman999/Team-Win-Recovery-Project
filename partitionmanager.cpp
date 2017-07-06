@@ -518,24 +518,23 @@ bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backu
 	time(&start);
 
 	if (Part->Backup(Backup_Folder, tar_fork_pid, progress)) {
-		bool digestSuccess = false;
+		sync();
+		sync();
+
+		if (!twrpDigestDriver::Make_Digest(generate_digest, Backup_Folder, Part->Backup_FileName))
+			goto backup_error;
+
 		if (Part->Has_SubPartition) {
 			std::vector<TWPartition*>::iterator subpart;
 
 			for (subpart = Partitions.begin(); subpart != Partitions.end(); subpart++) {
 				if ((*subpart)->Can_Be_Backed_Up && (*subpart)->Is_SubPartition && (*subpart)->SubPartition_Of == Part->Mount_Point) {
-					if (!(*subpart)->Backup(Backup_Folder, tar_fork_pid, progress)) {
-						Clean_Backup_Folder(Backup_Folder);
-						TWFunc::copy_file("/tmp/recovery.log", backup_log, 0644);
-						tw_set_default_metadata(backup_log.c_str());
-						TWFunc::SetPerformanceMode(false);
-						return false;
-					}
+					if (!(*subpart)->Backup(Backup_Folder, tar_fork_pid, progress))
+						goto backup_error;
 					sync();
 					sync();
 					if (!twrpDigestDriver::Make_Digest(generate_digest, Backup_Folder, (*subpart)->Backup_FileName)) {
-						TWFunc::SetPerformanceMode(false);
-						return false;
+						goto backup_error;
 					}
 				}
 			}
@@ -549,17 +548,15 @@ bool TWPartitionManager::Backup_Partition(TWPartition* Part, const string& Backu
 			*img_time += backup_time;
 		}
 
-		digestSuccess = twrpDigestDriver::Make_Digest(generate_digest, Backup_Folder, Part->Backup_FileName);
 		TWFunc::SetPerformanceMode(false);
-		return digestSuccess;
-	} else {
-		Clean_Backup_Folder(Backup_Folder);
-		TWFunc::copy_file("/tmp/recovery.log", backup_log, 0644);
-		tw_set_default_metadata(backup_log.c_str());
-		TWFunc::SetPerformanceMode(false);
-		return false;
+		return true;
 	}
-	return 0;
+backup_error:
+	Clean_Backup_Folder(Backup_Folder);
+	TWFunc::copy_file("/tmp/recovery.log", backup_log, 0644);
+	tw_set_default_metadata(backup_log.c_str());
+	TWFunc::SetPerformanceMode(false);
+	return false;
 }
 
 void TWPartitionManager::Clean_Backup_Folder(string Backup_Folder) {
