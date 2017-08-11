@@ -1052,7 +1052,6 @@ int twrpTar::createTar() {
 		}
 	} else {
 		// Not compressed or encrypted
-		current_archive_type = UNCOMPRESSED;
 		init_libtar_buffer(0, progress_pipe_fd);
 		tar_type.writefunc = write_tar;
 		if (tar_open(&t, charTarFile, &tar_type, O_WRONLY | O_CREAT | O_LARGEFILE, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH, TWTAR_FLAGS) == -1) {
