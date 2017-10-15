@@ -346,7 +346,6 @@ protected:
 	int multirom_create_internal_rom_name(std::string arg);
 	int multirom_list_roms_for_swap(std::string arg);
 #endif //TARGET_RECOVERY_IS_MULTIROM
-	int checkforapp(std::string arg);
 
 	// (originally) threaded actions
 	int fileexists(std::string arg);
@@ -407,7 +406,6 @@ protected:
 	int togglebacklight(std::string arg);
 	int twcmd(std::string arg);
 	int setbootslot(std::string arg);
-	int installapp(std::string arg);
 
 	int simulate;
 };
