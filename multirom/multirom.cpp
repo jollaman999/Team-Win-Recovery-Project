@@ -3279,7 +3279,7 @@ void MultiROM::executeCacheScripts()
 			if(stat((path + SCRIPT_FILE_CACHE).c_str(), &info) < 0)
 				continue;
 
-			if(info.st_mtime > script.mtime)
+			if((time_t)info.st_mtime > script.mtime)
 			{
 				script.mtime = info.st_mtime;
 				script.name = dt->d_name;
@@ -3291,7 +3291,7 @@ void MultiROM::executeCacheScripts()
 			if(stat((path + UBUNTU_COMMAND_FILE).c_str(), &info) < 0)
 				continue;
 
-			if(info.st_mtime > script.mtime)
+			if((time_t)info.st_mtime > script.mtime)
 			{
 				script.mtime = info.st_mtime;
 				script.name = dt->d_name;
