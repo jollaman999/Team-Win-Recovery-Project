@@ -1007,7 +1007,6 @@ bool MultiROM::changeMounts(std::string name)
 	}
 
 	PartitionManager.Update_System_Details();
-	PartitionManager.Output_Partition_Logging();
 
 	if(!cache->Mount(true) || !sys->Mount(true) || !data->Mount(true))
 	{
@@ -1022,6 +1021,8 @@ bool MultiROM::changeMounts(std::string name)
 		TWFunc::Toggle_MTP(mtp_was_enabled);
 		return false;
 	}
+
+	PartitionManager.Output_Partition_Logging();
 
 	// SuperSU tries *very* hard to mount /data and /system, even looks through
 	// recovery.fstab and manages to mount the real /system
