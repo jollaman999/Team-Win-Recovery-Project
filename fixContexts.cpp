@@ -34,9 +34,12 @@ using namespace std;
 
 struct selabel_handle *sehandle;
 struct selinux_opt selinux_options[] = {
-	{ SELABEL_OPT_PATH, "/file_contexts.bin" }
+	{ SELABEL_OPT_PATH, "/plat_file_contexts" }
 };
 struct selinux_opt selinux_options_old[] = {
+	{ SELABEL_OPT_PATH, "/file_contexts.bin" }
+};
+struct selinux_opt selinux_options_oldest[] = {
 	{ SELABEL_OPT_PATH, "/file_contexts" }
 };
 
@@ -97,14 +100,20 @@ int fixContexts::fixDataMediaContexts(string Mount_Point) {
 
 	LOGINFO("Fixing media contexts on '%s'\n", Mount_Point.c_str());
 
-	if (TWFunc::Path_Exists("/file_contexts.bin")) {
+	if (TWFunc::Path_Exists("/plat_file_contexts")) {
 		sehandle = selabel_open(SELABEL_CTX_FILE, selinux_options, 1);
+		if (!sehandle) {
+			LOGINFO("Unable to open /plat_file_contexts\n");
+			return 0;
+		}
+	} else if (TWFunc::Path_Exists("/file_contexts.bin")) {
+		sehandle = selabel_open(SELABEL_CTX_FILE, selinux_options_old, 1);
 		if (!sehandle) {
 			LOGINFO("Unable to open /file_contexts.bin\n");
 			return 0;
 		}
 	} else if (TWFunc::Path_Exists("/file_contexts")) {
-		sehandle = selabel_open(SELABEL_CTX_FILE, selinux_options_old, 1);
+		sehandle = selabel_open(SELABEL_CTX_FILE, selinux_options_oldest, 1);
 		if (!sehandle) {
 			LOGINFO("Unable to open /file_contexts\n");
 			return 0;

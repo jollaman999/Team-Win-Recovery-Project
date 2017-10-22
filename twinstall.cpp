@@ -173,6 +173,8 @@ static int Prepare_Update_Binary(const char *path, ZipArchive *Zip, int* wipe_ca
 	const ZipEntry* selinx_contexts = NULL;
 	string output_filename;
 
+	// Oreo roms dose not contain plat_file_contexts in zip file.
+
 	selinx_contexts = mzFindZipEntry(Zip, "file_contexts.bin");
 	if (selinx_contexts == NULL) {
 		selinx_contexts = mzFindZipEntry(Zip, "file_contexts");

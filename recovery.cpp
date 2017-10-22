@@ -1611,7 +1611,17 @@ int main(int argc, char **argv) {
     ui->SetBackground(RecoveryUI::NONE);
     if (show_text) ui->ShowText(true);
 
-    if (TWFunc::Path_Exists("/file_contexts.bin")) {
+    if (TWFunc::Path_Exists("/plat_file_contexts")) {
+        struct selinux_opt seopts[] = {
+        { SELABEL_OPT_PATH, "/plat_file_contexts" }
+        };
+
+        sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+
+        if (!sehandle) {
+            ui->Print("Warning: No plat_file_contexts\n");
+        }
+    } else if (TWFunc::Path_Exists("/file_contexts.bin")) {
         struct selinux_opt seopts[] = {
         { SELABEL_OPT_PATH, "/file_contexts.bin" }
         };

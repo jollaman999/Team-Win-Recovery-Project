@@ -619,9 +619,10 @@ endif
 
 #MultiROM uses restorecon -D which is only available in toolbox
 # Update: This no longer works since restorecon has been moved to toybox,
-#         furthermore the existence of file_contexts and file_contexts.bin
-#         has made recovery based restorecon unreliable for secondary ROMs
-#         so instead opt for using the secondary ROM's own restorecon
+#         furthermore the existence of file_contexts and file_contexts.bin,
+#         plat_file_contexts has made recovery based restorecon unreliable
+#         for secondary ROMs so instead opt for using the secondary ROM's
+#         own restorecon
 #ifeq ($(TARGET_RECOVERY_IS_MULTIROM), true)
 #	exclude += restorecon
 #endif

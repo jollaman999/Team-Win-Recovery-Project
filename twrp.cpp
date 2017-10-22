@@ -119,12 +119,12 @@ int main(int argc, char **argv) {
 	printf("Setting SELinux to permissive\n");
 	TWFunc::write_file("/sys/fs/selinux/enforce", "0");
 
-	if (TWFunc::Path_Exists("/file_contexts"))
-		inject_file_contexts("/file_contexts");
-	if (TWFunc::Path_Exists("/file_contexts.bin"))
-		inject_file_contexts("/file_contexts.bin");
 	if (TWFunc::Path_Exists("/plat_file_contexts"))
 		inject_file_contexts("/plat_file_contexts");
+	if (TWFunc::Path_Exists("/file_contexts.bin"))
+		inject_file_contexts("/file_contexts.bin");
+	if (TWFunc::Path_Exists("/file_contexts"))
+		inject_file_contexts("/file_contexts");
 
 	// MultiROM _might_ have crashed the recovery while the boot device was redirected.
 	// It would be bad to let that as is.
@@ -166,30 +166,24 @@ int main(int argc, char **argv) {
 	// Load up all the resources
 	gui_loadResources();
 
-	bool is_new_file_contexts = TWFunc::Path_Exists("/file_contexts.bin");
-	bool is_old_file_contexts = TWFunc::Path_Exists("/file_contexts");
-	string file_contexts_path;
+	string file_contexts_path = "";
 
-	if (TWFunc::Path_Exists("/prebuilt_file_contexts")) {
-		if (is_new_file_contexts) {
-			printf("Renaming regular /file_contexts.bin -> /file_contexts.bin.bak\n");
-			rename("/file_contexts.bin", "/file_contexts.bin.bak");
-			printf("Moving /prebuilt_file_contexts -> /file_contexts.bin\n");
-			rename("/prebuilt_file_contexts", "/file_contexts.bin");
-		} else if (is_old_file_contexts) {
-			printf("Renaming regular /file_contexts -> /file_contexts.bak\n");
-			rename("/file_contexts", "/file_contexts.bak");
-			printf("Moving /prebuilt_file_contexts -> /file_contexts\n");
-			rename("/prebuilt_file_contexts", "/file_contexts");
-		}
-	}
-
-	if (is_new_file_contexts)
+	if (TWFunc::Path_Exists("/plat_file_contexts"))
+		file_contexts_path = "/plat_file_contexts";
+	if (TWFunc::Path_Exists("/file_contexts.bin"))
 		file_contexts_path = "/file_contexts.bin";
-	else if (is_old_file_contexts)
+	else if (TWFunc::Path_Exists("/file_contexts"))
 		file_contexts_path = "/file_contexts";
 
-	if (is_new_file_contexts || is_old_file_contexts) {
+	if (TWFunc::Path_Exists("/prebuilt_file_contexts")) {
+			string file_contexts_bak_path = file_contexts_path + ".bak";
+			printf("Renaming regular %s -> %s\n", file_contexts_path.c_str(), file_contexts_bak_path.c_str());
+			rename(file_contexts_path.c_str(), file_contexts_bak_path.c_str());
+			printf("Moving /prebuilt_file_contexts -> %s\n", file_contexts_path.c_str());
+			rename("/prebuilt_file_contexts", file_contexts_path.c_str());
+	}
+
+	if (!file_contexts_path.empty()) {
 		struct selinux_opt selinux_options[] = {
 			{ SELABEL_OPT_PATH, file_contexts_path.c_str() }
 		};

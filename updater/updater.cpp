@@ -106,6 +106,8 @@ int main(int argc, char** argv) {
     string selinux_contexts_tmp;
     bool selinux_contexts_old = false;
 
+    // Oreo roms dose not contain plat_file_contexts in zip file.
+
     file_contexts_entry = mzFindZipEntry(&za, "file_contexts.bin";
     if (file_contexts_entry == NULL) {
         file_contexts_entry = mzFindZipEntry(Zip, "file_contexts");

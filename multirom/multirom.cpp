@@ -471,11 +471,25 @@ bool MultiROM::restorecon(std::string name)
 {
 	bool res = false;
 	bool replaced_contexts = false;
-	bool file_contexts_old = false;
+	int file_contexts_old_type;
 
 	std::string file_contexts = getRomsPath() + name;
 	std::string seapp_contexts = file_contexts + "/boot/seapp_contexts";
-	if (TWFunc::Path_Exists(file_contexts + "/boot/file_contexts.bin")) {
+	if (TWFunc::Path_Exists(file_contexts + "/boot/plat_file_contexts")) {
+		file_contexts += "/boot/plat_file_contexts";
+		seapp_contexts = file_contexts + "/boot/plat_seapp_contexts";
+
+		if(access(file_contexts.c_str(), R_OK) >= 0)
+		{
+			gui_print("Using ROM's plat_file_contexts\n");
+			rename("/plat_file_contexts", "/plat_file_contexts.orig");
+			rename("/plat_seapp_contexts", "/plat_seapp_contexts.orig");
+			system_args("cp -a \"%s\" /plat_file_contexts", file_contexts.c_str());
+			system_args("cp -a \"%s\" /plat_seapp_contexts", seapp_contexts.c_str());
+			replaced_contexts = true;
+			file_contexts_old_type = 0;
+		}
+	} else if (TWFunc::Path_Exists(file_contexts + "/boot/file_contexts.bin")) {
 		file_contexts += "/boot/file_contexts.bin";
 
 		if(access(file_contexts.c_str(), R_OK) >= 0)
@@ -486,6 +500,7 @@ bool MultiROM::restorecon(std::string name)
 			system_args("cp -a \"%s\" /file_contexts.bin", file_contexts.c_str());
 			system_args("cp -a \"%s\" /seapp_contexts", seapp_contexts.c_str());
 			replaced_contexts = true;
+			file_contexts_old_type = 1;
 		}
 	} else if (TWFunc::Path_Exists(file_contexts + "/boot/file_contexts")) {
 		file_contexts += "/boot/file_contexts";
@@ -498,7 +513,7 @@ bool MultiROM::restorecon(std::string name)
 			system_args("cp -a \"%s\" /file_contexts", file_contexts.c_str());
 			system_args("cp -a \"%s\" /seapp_contexts", seapp_contexts.c_str());
 			replaced_contexts = true;
-			file_contexts_old = true;
+			file_contexts_old_type = 2;
 		}
 	}
 
@@ -555,21 +570,34 @@ bool MultiROM::restorecon(std::string name)
 	res = true;
 exit:
 	if(replaced_contexts) {
-		if (file_contexts_old) {
+		if (file_contexts_old_type == 0) {
+			if(access("/plat_file_contexts.orig", R_OK) >= 0)
+				rename("/plat_file_contexts.orig", "/plat_file_contexts");
+			else
+				remove("/plat_file_contexts");
+		} else if (file_contexts_old_type == 1) {
+			if(access("/file_contexts.bin.orig", R_OK) >= 0)
+				rename("/file_contexts.bin.orig", "/file_contexts.bin");
+			else
+			remove("/file_contexts.bin");
+		} else if (file_contexts_old_type == 2) {
 			if(access("/file_contexts.orig", R_OK) >= 0)
 				rename("/file_contexts.orig", "/file_contexts");
 			else
 				remove("/file_contexts");
-		} else {
-			if(access("/file_contexts.bin.orig", R_OK) >= 0)
-				rename("/file_contexts.bin.orig", "/file_contexts.bin");
-			else
-				remove("/file_contexts.bin");
 		}
-		if(access("/seapp_contexts.orig", R_OK) >= 0)
-			rename("/seapp_contexts.orig", "/seapp_contexts");
-		else
-			remove("/seapp_contexts");
+
+		if (file_contexts_old_type == 0) {
+			if(access("/plat_seapp_contexts.orig", R_OK) >= 0)
+				rename("/plat_seapp_contexts.orig", "/plat_seapp_contexts");
+			else
+				remove("/plat_seapp_contexts");
+		} else {
+			if(access("/seapp_contexts.orig", R_OK) >= 0)
+				rename("/seapp_contexts.orig", "/seapp_contexts");
+			else
+				remove("/seapp_contexts");
+		}
 	}
 	return res;
 }
@@ -1958,13 +1986,24 @@ bool MultiROM::createImage(const std::string& base, const char *img, int size)
 
 	// make_ext4fs errors out if it has unknown path
 	bool is_known_path = !strcmp(img, "data") || !strcmp(img, "system") || !strcmp(img, "cache");
-	if (TWFunc::Path_Exists("/file_contexts.bin") && is_known_path) {
-		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM -a \"/%s\" -S /file_contexts.bin \"%s/%s.img\"", size, img, base.c_str(), img);
-	} else if (TWFunc::Path_Exists("/file_contexts") && is_known_path) {
-		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM -a \"/%s\" -S /file_contexts \"%s/%s.img\"", size, img, base.c_str(), img);
-	} else {
-		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM \"%s/%s.img\"", size, base.c_str(), img);
+	string file_contexts_path = "";
+	if (is_known_path) {
+		if (TWFunc::Path_Exists("/plat_file_contexts")) {
+			file_contexts_path = "/plat_file_contexts";
+		} else if (TWFunc::Path_Exists("/file_contexts.bin")) {
+			file_contexts_path = "/file_contexts.bin";
+		} else if (TWFunc::Path_Exists("/file_contexts")) {
+			file_contexts_path = "/file_contexts";
+		}
+
+		if (!file_contexts_path.empty()) {
+			string command = "make_ext4fs -l %dM -a \"/%s\" -S " + file_contexts_path + " \"%s/%s.img\"";
+			snprintf(cmd, sizeof(cmd), command.c_str(), size, img, base.c_str(), img);
+		}
 	}
+
+	if (!is_known_path && file_contexts_path.empty())
+		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM \"%s/%s.img\"", size, base.c_str(), img);
 
 	LOGINFO("Creating image with cmd: %s\n", cmd);
 	return system(cmd) == 0;
@@ -2026,7 +2065,17 @@ bool MultiROM::createSparseImage(const std::string& base, const char *img)
 	char cmd[256];
 
 	// make_ext4fs errors out if it has unknown path
-	if(TWFunc::Path_Exists("/file_contexts") &&
+	if(TWFunc::Path_Exists("/plat_file_contexts") &&
+		(!strcmp(img, "data") ||
+		!strcmp(img, "system") ||
+		!strcmp(img, "cache"))) {
+		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM -a \"/%s\" -S /plat_file_contexts \"%s/%s.sparse.img\"", max_size_MB, img, base.c_str(), img);
+	} else if(TWFunc::Path_Exists("/file_contexts.bin") &&
+		(!strcmp(img, "data") ||
+		!strcmp(img, "system") ||
+		!strcmp(img, "cache"))) {
+		snprintf(cmd, sizeof(cmd), "make_ext4fs -l %dM -a \"/%s\" -S /file_contexts.bin \"%s/%s.sparse.img\"", max_size_MB, img, base.c_str(), img);
+	} else if(TWFunc::Path_Exists("/file_contexts") &&
 		(!strcmp(img, "data") ||
 		 !strcmp(img, "system") ||
 		 !strcmp(img, "cache"))) {
@@ -2192,10 +2241,20 @@ bool MultiROM::extractBootForROM(std::string base)
 	}
 
 	// copy needed files
-	if (TWFunc::Path_Exists("/tmp/boot/file_contexts.bin")) {
+	if (TWFunc::Path_Exists("/tmp/boot/plat_file_contexts")) {
 		static const char *cp_f[] = {
 			"*.rc", "default.prop", "init", "main_init", "fstab.*",
-			// Since Android 4.3 - for SELinux
+			// Since Android 8.0 - for SELinux
+			"plat_file_contexts", "plat_property_contexts", "plat_seapp_contexts", "sepolicy",
+			NULL
+		};
+
+		for(int i = 0; cp_f[i]; ++i)
+			system_args("cp -a /tmp/boot/%s \"%s/boot/\"", cp_f[i], base.c_str());
+	} else if (TWFunc::Path_Exists("/tmp/boot/file_contexts.bin")) {
+		static const char *cp_f[] = {
+			"*.rc", "default.prop", "init", "main_init", "fstab.*",
+			// Since Android 7.0 - for SELinux
 			"file_contexts.bin", "property_contexts", "seapp_contexts", "sepolicy",
 			NULL
 		};
