@@ -158,6 +158,7 @@ static int Prepare_Update_Binary(const char *path, ZipWrap *Zip, int* wipe_cache
 	}
 
 	// If exists, extract file_contexts from the zip file
+	// Oreo roms dose not contain plat_file_contexts in zip file.
 	string output_filename;
 	string output_filepath;
 	bool file_contexts_found = false;
