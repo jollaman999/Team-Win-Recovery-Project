@@ -2235,7 +2235,9 @@ bool TWPartition::Wipe_EXT4() {
 			Command += len;
 		}
 
-		if (TWFunc::Path_Exists("/file_contexts.bin")) {
+		if (TWFunc::Path_Exists("/plat_file_contexts")) {
+			Command += " -S /plat_file_contexts";
+		} else if (TWFunc::Path_Exists("/file_contexts.bin")) {
 			Command += " -S /file_contexts.bin";
 		} else if (TWFunc::Path_Exists("/file_contexts")) {
 			Command += " -S /file_contexts";

@@ -168,7 +168,13 @@ int main(int argc, char** argv) {
   }
   ota_io_init(za, state.is_retry);
 
-  if (access("/tmp/file_contexts.bin", R_OK) == 0) {
+  if (access("/plat_file_contexts", R_OK) == 0) {
+    struct selinux_opt seopts[] = {
+      { SELABEL_OPT_PATH, "/plat_file_contexts" }
+    };
+
+    sehandle = selabel_open(SELABEL_CTX_FILE, seopts, 1);
+  } else if (access("/tmp/file_contexts.bin", R_OK) == 0) {
     struct selinux_opt seopts[] = {
       { SELABEL_OPT_PATH, "/tmp/file_contexts.bin" }
     };
