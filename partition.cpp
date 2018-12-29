@@ -31,10 +31,7 @@
 #include <sys/param.h>
 #include <fcntl.h>
 
-#ifdef TW_INCLUDE_CRYPTO
-	#include "cutils/properties.h"
-#endif
-
+#include "cutils/properties.h"
 #include "libblkid/include/blkid.h"
 #include "variables.h"
 #include "twcommon.h"
@@ -133,6 +130,7 @@ enum TW_FSTAB_FLAGS {
 	TWFLAG_CANENCRYPTBACKUP,
 	TWFLAG_DISPLAY,
 	TWFLAG_ENCRYPTABLE,
+	TWFLAG_FILEENCRYPTION,
 	TWFLAG_FLASHIMG,
 	TWFLAG_FORCEENCRYPT,
 	TWFLAG_FSFLAGS,
@@ -179,6 +177,7 @@ const struct flag_list tw_flags[] = {
 	{ "defaults",               TWFLAG_DEFAULTS },
 	{ "display=",               TWFLAG_DISPLAY },
 	{ "encryptable=",           TWFLAG_ENCRYPTABLE },
+	{ "fileencryption=",        TWFLAG_FILEENCRYPTION },
 	{ "flashimg",               TWFLAG_FLASHIMG },
 	{ "forceencrypt=",          TWFLAG_FORCEENCRYPT },
 	{ "fsflags=",               TWFLAG_FSFLAGS },
@@ -477,7 +476,7 @@ bool TWPartition::Process_Fstab_Line(const char *fstab_line, bool Display_Error,
 	} else if (Is_File_System(Fstab_File_System)) {
 		Find_Actual_Block_Device();
 		Setup_File_System(Display_Error);
-		if (Mount_Point == "/system") {
+		if (Mount_Point == PartitionManager.Get_Android_Root_Path()) {
 			Display_Name = "System";
 			Backup_Display_Name = Display_Name;
 			Storage_Name = Display_Name;
@@ -867,6 +866,24 @@ void TWPartition::Apply_TW_Flag(const unsigned flag, const char* str, const bool
 		case TWFLAG_ENCRYPTABLE:
 		case TWFLAG_FORCEENCRYPT:
 			Crypto_Key_Location = str;
+			break;
+		case TWFLAG_FILEENCRYPTION:
+			// This flag isn't used by TWRP but is needed in 9.0 FBE decrypt
+			// fileencryption=ice:aes-256-heh
+			{
+				std::string FBE = str;
+				std::string FBE_contents, FBE_filenames;
+				size_t colon_loc = FBE.find(":");
+				if (colon_loc == std::string::npos) {
+					LOGINFO("Invalid fileencryption fstab flag: '%s'\n", str);
+					break;
+				}
+				FBE_contents = FBE.substr(0, colon_loc);
+				FBE_filenames = FBE.substr(colon_loc + 1);
+				property_set("fbe.contents", FBE_contents.c_str());
+				property_set("fbe.filenames", FBE_filenames.c_str());
+				LOGINFO("FBE contents '%s', filenames '%s'\n", FBE_contents.c_str(), FBE_filenames.c_str());
+			}
 			break;
 		case TWFLAG_FLASHIMG:
 			Can_Flash_Img = val;
@@ -1620,7 +1637,7 @@ bool TWPartition::UnMount(bool Display_Error) {
 		int never_unmount_system;
 
 		DataManager::GetValue(TW_DONT_UNMOUNT_SYSTEM, never_unmount_system);
-		if (never_unmount_system == 1 && Mount_Point == "/system")
+		if (never_unmount_system == 1 && Mount_Point == PartitionManager.Get_Android_Root_Path())
 			return true; // Never unmount system if you're not supposed to unmount it
 
 		if (Is_Storage && MTP_Storage_ID > 0)
@@ -2569,8 +2586,9 @@ bool TWPartition::Raw_Read_Write(PartitionSettings *part_settings) {
 		srcfn = Actual_Block_Device;
 		if (part_settings->adbbackup)
 			destfn = TW_ADB_BACKUP;
-		else
+		else {
 			destfn = part_settings->Backup_Folder + "/" + Backup_FileName;
+		}
 	}
 	else {
 		destfn = Actual_Block_Device;
@@ -2761,7 +2779,7 @@ bool TWPartition::Restore_Tar(PartitionSettings *part_settings) {
 		ret = true;
 #ifdef HAVE_CAPABILITIES
 	// Restore capabilities to the run-as binary
-	if (Mount_Point == "/system" && Mount(true) && TWFunc::Path_Exists("/system/bin/run-as")) {
+	if (Mount_Point == PartitionManager.Get_Android_Root_Path() && Mount(true) && TWFunc::Path_Exists("/system/bin/run-as")) {
 		struct vfs_cap_data cap_data;
 		uint64_t capabilities = (1 << CAP_SETUID) | (1 << CAP_SETGID);
 

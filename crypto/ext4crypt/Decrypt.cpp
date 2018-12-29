@@ -15,7 +15,11 @@
  */
 
 #include "Decrypt.h"
+#ifdef USE_KEYSTORAGE_4
+#include "Ext4CryptPie.h"
+#else
 #include "Ext4Crypt.h"
+#endif
 
 #include <map>
 #include <string>
@@ -50,12 +54,16 @@
 
 #include <ext4_utils/ext4_crypt.h>
 
+#ifdef USE_KEYSTORAGE_4
+#include <android/security/IKeystoreService.h>
+#else
 #include <keystore/IKeystoreService.h>
+#include <keystore/authorization_set.h>
+#endif
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
 #include <keystore/keystore.h>
-#include <keystore/authorization_set.h>
 
 #include <algorithm>
 extern "C" {
@@ -433,9 +441,13 @@ sp<IBinder> getKeystoreBinderRetry() {
 
 namespace keystore {
 
-#define SYNTHETIC_PASSWORD_VERSION 1
+#define SYNTHETIC_PASSWORD_VERSION_V1 1
+#define SYNTHETIC_PASSWORD_VERSION 2
 #define SYNTHETIC_PASSWORD_PASSWORD_BASED 0
 #define SYNTHETIC_PASSWORD_KEY_PREFIX "USRSKEY_synthetic_password_"
+#define USR_PRIVATE_KEY_PREFIX "USRPKEY_synthetic_password_"
+
+static std::string mKey_Prefix;
 
 /* The keystore alias subid is sometimes the same as the handle, but not always.
  * In the case of handle 0c5303fd2010fe29, the alias subid used c5303fd2010fe29
@@ -446,13 +458,19 @@ namespace keystore {
  * folder so that any key upgrades that might take place do not actually
  * upgrade the keys on the data partition. We rename all 1000 uid files to 0
  * to pass the keystore permission checks. */
-bool Find_Keystore_Alias_SubID_And_Prep_Files(const userid_t user_id, std::string& keystoreid) {
+bool Find_Keystore_Alias_SubID_And_Prep_Files(const userid_t user_id, std::string& keystoreid, const std::string& handle_str) {
 	char path_c[PATH_MAX];
 	sprintf(path_c, "/data/misc/keystore/user_%d", user_id);
 	char user_dir[PATH_MAX];
 	sprintf(user_dir, "user_%d", user_id);
 	std::string source_path = "/data/misc/keystore/";
 	source_path += user_dir;
+	std::string handle_sub = handle_str;
+	while (handle_sub.substr(0,1) == "0") {
+		std::string temp = handle_sub.substr(1);
+		handle_sub = temp;
+	}
+	mKey_Prefix = "";
 
 	mkdir("/tmp/misc", 0755);
 	mkdir("/tmp/misc/keystore", 0755);
@@ -474,6 +492,7 @@ bool Find_Keystore_Alias_SubID_And_Prep_Files(const userid_t user_id, std::strin
 	struct dirent* de = 0;
 	size_t prefix_len = strlen(SYNTHETIC_PASSWORD_KEY_PREFIX);
 	bool found_subid = false;
+	bool has_pkey = false; // PKEY has priority over SKEY
 
 	while ((de = readdir(dir)) != 0) {
 		if (strcmp(de->d_name, ".") == 0 || strcmp(de->d_name, "..") == 0)
@@ -482,14 +501,25 @@ bool Find_Keystore_Alias_SubID_And_Prep_Files(const userid_t user_id, std::strin
 			size_t len = strlen(de->d_name);
 			if (len <= prefix_len)
 				continue;
-			if (!strstr(de->d_name, SYNTHETIC_PASSWORD_KEY_PREFIX))
+			if (strstr(de->d_name, SYNTHETIC_PASSWORD_KEY_PREFIX) && !has_pkey)
+				mKey_Prefix = SYNTHETIC_PASSWORD_KEY_PREFIX;
+			else if (strstr(de->d_name, USR_PRIVATE_KEY_PREFIX)) {
+				mKey_Prefix = USR_PRIVATE_KEY_PREFIX;
+				has_pkey = true;
+			} else
 				continue;
-			std::string file = de->d_name;
-			std::size_t found = file.find_last_of("_");
-			if (found != std::string::npos) {
-				keystoreid = file.substr(found + 1);
-				printf("keystoreid: '%s'\n", keystoreid.c_str());
+			if (strstr(de->d_name, handle_sub.c_str())) {
+				keystoreid = handle_sub;
+				printf("keystoreid matched handle_sub: '%s'\n", keystoreid.c_str());
 				found_subid = true;
+			} else {
+				std::string file = de->d_name;
+				std::size_t found = file.find_last_of("_");
+				if (found != std::string::npos) {
+					keystoreid = file.substr(found + 1);
+					printf("possible keystoreid: '%s'\n", keystoreid.c_str());
+					//found_subid = true; // we'll keep going in hopes that we find a pkey or a match to the handle_sub
+				}
 			}
 		}
 		std::string src = source_path;
@@ -507,6 +537,8 @@ bool Find_Keystore_Alias_SubID_And_Prep_Files(const userid_t user_id, std::strin
 		dstof.close();
 	}
 	closedir(dir);
+	if (!found_subid && !mKey_Prefix.empty() && !keystoreid.empty())
+		found_subid = true;
 	return found_subid;
 }
 
@@ -517,14 +549,18 @@ std::string unwrapSyntheticPasswordBlob(const std::string& spblob_path, const st
 	std::string disk_decryption_secret_key = "";
 
 	std::string keystore_alias_subid;
-	if (!Find_Keystore_Alias_SubID_And_Prep_Files(user_id, keystore_alias_subid)) {
+	if (!Find_Keystore_Alias_SubID_And_Prep_Files(user_id, keystore_alias_subid, handle_str)) {
 		printf("failed to scan keystore alias subid and prep keystore files\n");
 		return disk_decryption_secret_key;
 	}
 
 	// First get the keystore service
     sp<IBinder> binder = getKeystoreBinderRetry();
+#ifdef USE_KEYSTORAGE_4
+	sp<security::IKeystoreService> service = interface_cast<security::IKeystoreService>(binder);
+#else
 	sp<IKeystoreService> service = interface_cast<IKeystoreService>(binder);
+#endif
 	if (service == NULL) {
 		printf("error: could not connect to keystore service\n");
 		return disk_decryption_secret_key;
@@ -542,186 +578,359 @@ std::string unwrapSyntheticPasswordBlob(const std::string& spblob_path, const st
 		printf("Failed to read '%s'\n", spblob_file.c_str());
 		return disk_decryption_secret_key;
 	}
-	const unsigned char* byteptr = (const unsigned char*)spblob_data.data();
-	if (*byteptr != SYNTHETIC_PASSWORD_VERSION) {
-		printf("SYNTHETIC_PASSWORD_VERSION does not match\n");
+	unsigned char* byteptr = (unsigned char*)spblob_data.data();
+	if (*byteptr != SYNTHETIC_PASSWORD_VERSION && *byteptr != SYNTHETIC_PASSWORD_VERSION_V1) {
+		printf("Unsupported synthetic password version %i\n", *byteptr);
 		return disk_decryption_secret_key;
 	}
+	const unsigned char* synthetic_password_version = byteptr;
 	byteptr++;
 	if (*byteptr != SYNTHETIC_PASSWORD_PASSWORD_BASED) {
 		printf("spblob data is not SYNTHETIC_PASSWORD_PASSWORD_BASED\n");
 		return disk_decryption_secret_key;
 	}
 	byteptr++; // Now we're pointing to the blob data itself
-	/* We're now going to handle decryptSPBlob: https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#115
-	 * Called from https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java#879
-	 * This small function ends up being quite a headache. The call to get data from the keystore basically is not needed in TWRP at this time.
-	 * The keystore data seems to be the serialized data from an entire class in Java. Specifically I think it represents:
-	 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreCipherSpiBase.java
-	 * or perhaps
-	 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java
-	 * but the only things we "need" from this keystore are a user ID and the keyAlias which ends up being USRSKEY_synthetic_password_{handle_str}
-	 * the latter of which we already have. We may need to figure out how to get the user ID if we ever support decrypting mulitple users.
-	 * There are 2 calls to a Java decrypt funcion that is overloaded. These 2 calls go in completely different directions despite the seemingly
-	 * similar use of decrypt() and decrypt parameters. To figure out where things were going, I added logging to:
-	 * https://android.googlesource.com/platform/libcore/+/android-8.0.0_r23/ojluni/src/main/java/javax/crypto/Cipher.java#2575
-	 * Logger.global.severe("Cipher tryCombinations " + prov.getName() + " - " + prov.getInfo());
-	 * To make logging work in libcore, import java.util.logging.Logger; and either set a better logging level or modify the framework to log everything
-	 * regardless of logging level. This will give you some strings that you can grep for and find the actual crypto provider in use. In our case there were
-	 * 2 different providers in use. The first stage to get the intermediate key used:
-	 * https://android.googlesource.com/platform/external/conscrypt/+/android-8.0.0_r23/common/src/main/java/org/conscrypt/OpenSSLProvider.java
-	 * which is a pretty straight-forward OpenSSL implementation of AES/GCM/NoPadding. */
-	// First we personalize as seen https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#102
-	void* personalized_application_id = PersonalizedHashBinary(PERSONALISATION_APPLICATION_ID, (const char*)application_id, application_id_size);
-	if (!personalized_application_id) {
-		printf("malloc personalized_application_id\n");
-		return disk_decryption_secret_key;
-	}
-	//printf("personalized application id: "); output_hex((unsigned char*)personalized_application_id, SHA512_DIGEST_LENGTH); printf("\n");
-	// Now we'll decrypt using openssl AES/GCM/NoPadding
-	OpenSSL_add_all_ciphers();
-	int actual_size=0, final_size=0;
-    EVP_CIPHER_CTX *d_ctx = EVP_CIPHER_CTX_new();
-    const unsigned char* iv = (const unsigned char*)byteptr; // The IV is the first 12 bytes of the spblob
-    //printf("iv: "); output_hex((const unsigned char*)iv, 12); printf("\n");
-    const unsigned char* cipher_text = (const unsigned char*)byteptr + 12; // The cipher text comes immediately after the IV
-    //printf("cipher_text: "); output_hex((const unsigned char*)cipher_text, spblob_data.size() - 2 - 12); printf("\n");
-    const unsigned char* key = (const unsigned char*)personalized_application_id; // The key is the now personalized copy of the application ID
-    //printf("key: "); output_hex((const unsigned char*)key, 32); printf("\n");
-    EVP_DecryptInit(d_ctx, EVP_aes_256_gcm(), key, iv);
-    std::vector<unsigned char> intermediate_key;
-    intermediate_key.resize(spblob_data.size() - 2 - 12, '\0');
-    EVP_DecryptUpdate(d_ctx, &intermediate_key[0], &actual_size, cipher_text, spblob_data.size() - 2 - 12);
-    unsigned char tag[AES_BLOCK_SIZE];
-    EVP_CIPHER_CTX_ctrl(d_ctx, EVP_CTRL_GCM_SET_TAG, 16, tag);
-    EVP_DecryptFinal_ex(d_ctx, &intermediate_key[actual_size], &final_size);
-    EVP_CIPHER_CTX_free(d_ctx);
-    free(personalized_application_id);
-    //printf("spblob_data size: %lu actual_size %i, final_size: %i\n", spblob_data.size(), actual_size, final_size);
-    intermediate_key.resize(actual_size + final_size - 16, '\0');// not sure why we have to trim the size by 16 as I don't see where this is done in Java side
-    //printf("intermediate key: "); output_hex((const unsigned char*)intermediate_key.data(), intermediate_key.size()); printf("\n");
-
-	// When using secdis (aka not weaver) you must supply an auth token to the keystore prior to the begin operation
-	if (auth_token_len > 0) {
-		/*::keystore::KeyStoreServiceReturnCode auth_result = service->addAuthToken(auth_token, auth_token_len);
-		if (!auth_result.isOk()) {
-			// The keystore checks the uid of the calling process and will return a permission denied on this operation for user 0
-			printf("keystore error adding auth token\n");
-			return disk_decryption_secret_key;
-		}*/
-		// The keystore refuses to allow the root user to supply auth tokens, so we write the auth token to a file earlier and
-		// run a separate service that runs user the system user to add the auth token. We wait for the auth token file to be
-		// deleted by the keymaster_auth service and check for a /auth_error file in case of errors. We quit after after a while if
-		// the /auth_token file never gets deleted.
-		int auth_wait_count = 20;
-		while (access("/auth_token", F_OK) == 0 && auth_wait_count-- > 0)
-			usleep(5000);
-		if (auth_wait_count == 0 || access("/auth_error", F_OK) == 0) {
-			printf("error during keymaster_auth service\n");
-			/* If you are getting this error, make sure that you have the keymaster_auth service defined in your init scripts, preferrably in init.recovery.{ro.hardware}.rc
-			 * service keystore_auth /sbin/keystore_auth
-			 *     disabled
-			 *     oneshot
-			 *     user system
-			 *     group root
-			 *     seclabel u:r:recovery:s0
-			 *
-			 * And check dmesg for error codes regarding this service if needed. */
+	if (*synthetic_password_version == SYNTHETIC_PASSWORD_VERSION_V1) {
+		printf("spblob v1\n");
+		/* We're now going to handle decryptSPBlob: https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#115
+		 * Called from https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java#879
+		 * This small function ends up being quite a headache. The call to get data from the keystore basically is not needed in TWRP at this time.
+		 * The keystore data seems to be the serialized data from an entire class in Java. Specifically I think it represents:
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreCipherSpiBase.java
+		 * or perhaps
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java
+		 * but the only things we "need" from this keystore are a user ID and the keyAlias which ends up being USRSKEY_synthetic_password_{handle_str}
+		 * the latter of which we already have. We may need to figure out how to get the user ID if we ever support decrypting mulitple users.
+		 * There are 2 calls to a Java decrypt funcion that is overloaded. These 2 calls go in completely different directions despite the seemingly
+		 * similar use of decrypt() and decrypt parameters. To figure out where things were going, I added logging to:
+		 * https://android.googlesource.com/platform/libcore/+/android-8.0.0_r23/ojluni/src/main/java/javax/crypto/Cipher.java#2575
+		 * Logger.global.severe("Cipher tryCombinations " + prov.getName() + " - " + prov.getInfo());
+		 * To make logging work in libcore, import java.util.logging.Logger; and either set a better logging level or modify the framework to log everything
+		 * regardless of logging level. This will give you some strings that you can grep for and find the actual crypto provider in use. In our case there were
+		 * 2 different providers in use. The first stage to get the intermediate key used:
+		 * https://android.googlesource.com/platform/external/conscrypt/+/android-8.0.0_r23/common/src/main/java/org/conscrypt/OpenSSLProvider.java
+		 * which is a pretty straight-forward OpenSSL implementation of AES/GCM/NoPadding. */
+		// First we personalize as seen https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#102
+		void* personalized_application_id = PersonalizedHashBinary(PERSONALISATION_APPLICATION_ID, (const char*)application_id, application_id_size);
+		if (!personalized_application_id) {
+			printf("malloc personalized_application_id\n");
 			return disk_decryption_secret_key;
 		}
+		//printf("personalized application id: "); output_hex((unsigned char*)personalized_application_id, SHA512_DIGEST_LENGTH); printf("\n");
+		// Now we'll decrypt using openssl AES/GCM/NoPadding
+		OpenSSL_add_all_ciphers();
+		int actual_size=0, final_size=0;
+		EVP_CIPHER_CTX *d_ctx = EVP_CIPHER_CTX_new();
+		const unsigned char* iv = (const unsigned char*)byteptr; // The IV is the first 12 bytes of the spblob
+		//printf("iv: "); output_hex((const unsigned char*)iv, 12); printf("\n");
+		const unsigned char* cipher_text = (const unsigned char*)byteptr + 12; // The cipher text comes immediately after the IV
+		//printf("cipher_text: "); output_hex((const unsigned char*)cipher_text, spblob_data.size() - 2 - 12); printf("\n");
+		const unsigned char* key = (const unsigned char*)personalized_application_id; // The key is the now personalized copy of the application ID
+		//printf("key: "); output_hex((const unsigned char*)key, 32); printf("\n");
+		EVP_DecryptInit(d_ctx, EVP_aes_256_gcm(), key, iv);
+		std::vector<unsigned char> intermediate_key;
+		intermediate_key.resize(spblob_data.size() - 2 - 12, '\0');
+		EVP_DecryptUpdate(d_ctx, &intermediate_key[0], &actual_size, cipher_text, spblob_data.size() - 2 - 12);
+		unsigned char tag[AES_BLOCK_SIZE];
+		EVP_CIPHER_CTX_ctrl(d_ctx, EVP_CTRL_GCM_SET_TAG, 16, tag);
+		EVP_DecryptFinal_ex(d_ctx, &intermediate_key[actual_size], &final_size);
+		EVP_CIPHER_CTX_free(d_ctx);
+		free(personalized_application_id);
+		//printf("spblob_data size: %lu actual_size %i, final_size: %i\n", spblob_data.size(), actual_size, final_size);
+		intermediate_key.resize(actual_size + final_size - 16, '\0');// not sure why we have to trim the size by 16 as I don't see where this is done in Java side
+		//printf("intermediate key: "); output_hex((const unsigned char*)intermediate_key.data(), intermediate_key.size()); printf("\n");
+
+		// When using secdis (aka not weaver) you must supply an auth token to the keystore prior to the begin operation
+		if (auth_token_len > 0) {
+			/*::keystore::KeyStoreServiceReturnCode auth_result = service->addAuthToken(auth_token, auth_token_len);
+			if (!auth_result.isOk()) {
+				// The keystore checks the uid of the calling process and will return a permission denied on this operation for user 0
+				printf("keystore error adding auth token\n");
+				return disk_decryption_secret_key;
+			}*/
+			// The keystore refuses to allow the root user to supply auth tokens, so we write the auth token to a file earlier and
+			// run a separate service that runs user the system user to add the auth token. We wait for the auth token file to be
+			// deleted by the keymaster_auth service and check for a /auth_error file in case of errors. We quit after after a while if
+			// the /auth_token file never gets deleted.
+			int auth_wait_count = 20;
+			while (access("/auth_token", F_OK) == 0 && auth_wait_count-- > 0)
+				usleep(5000);
+			if (auth_wait_count == 0 || access("/auth_error", F_OK) == 0) {
+				printf("error during keymaster_auth service\n");
+				/* If you are getting this error, make sure that you have the keymaster_auth service defined in your init scripts, preferrably in init.recovery.{ro.hardware}.rc
+				 * service keystore_auth /sbin/keystore_auth
+				 *     disabled
+				 *     oneshot
+				 *     user system
+				 *     group root
+				 *     seclabel u:r:recovery:s0
+				 *
+				 * And check dmesg for error codes regarding this service if needed. */
+				return disk_decryption_secret_key;
+			}
+		}
+
+		int32_t ret;
+
+		/* We only need a keyAlias which is USRSKEY_synthetic_password_b6f71045af7bd042 which we find and a uid which is -1 or 1000, I forget which
+		 * as the key data will be read again by the begin function later via the keystore.
+		 * The data is in a hidl_vec format which consists of a type and a value. */
+		/*::keystore::hidl_vec<uint8_t> data;
+		std::string keystoreid = SYNTHETIC_PASSWORD_KEY_PREFIX;
+		keystoreid += handle_str;
+
+		ret = service->get(String16(keystoreid.c_str()), user_id, &data);
+		if (ret < 0) {
+			printf("Could not connect to keystore service %i\n", ret);
+			return disk_decryption_secret_key;
+		} else if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*//*) {
+			printf("keystore error: (%d)\n", /*responses[ret],*//* ret);
+			return disk_decryption_secret_key;
+		} else {
+			printf("keystore returned: "); output_hex(&data[0], data.size()); printf("\n");
+		}*/
+
+		// Now we'll break up the intermediate key into the IV (first 12 bytes) and the cipher text (the rest of it).
+		std::vector<unsigned char> nonce = intermediate_key;
+		nonce.resize(12);
+		intermediate_key.erase (intermediate_key.begin(),intermediate_key.begin()+12);
+		//printf("nonce: "); output_hex((const unsigned char*)nonce.data(), nonce.size()); printf("\n");
+		//printf("cipher text: "); output_hex((const unsigned char*)intermediate_key.data(), intermediate_key.size()); printf("\n");
+
+		/* Now we will begin the second decrypt call found in
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#122
+		 * This time we will use https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreCipherSpiBase.java
+		 * and https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java
+		 * First we set some algorithm parameters as seen in two places:
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java#297
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java#216 */
+		size_t maclen = 128;
+		::keystore::AuthorizationSetBuilder begin_params;
+		begin_params.Authorization(::keystore::TAG_ALGORITHM, ::keystore::Algorithm::AES);
+		begin_params.Authorization(::keystore::TAG_BLOCK_MODE, ::keystore::BlockMode::GCM);
+		begin_params.Padding(::keystore::PaddingMode::NONE);
+		begin_params.Authorization(::keystore::TAG_NONCE, nonce);
+		begin_params.Authorization(::keystore::TAG_MAC_LENGTH, maclen);
+		//keymasterArgs.addEnum(KeymasterDefs.KM_TAG_ALGORITHM, KeymasterDefs.KM_ALGORITHM_AES);
+		//keymasterArgs.addEnum(KeymasterDefs.KM_TAG_BLOCK_MODE, mKeymasterBlockMode);
+		//keymasterArgs.addEnum(KeymasterDefs.KM_TAG_PADDING, mKeymasterPadding);
+		//keymasterArgs.addUnsignedInt(KeymasterDefs.KM_TAG_MAC_LENGTH, mTagLengthBits);
+		::keystore::hidl_vec<uint8_t> entropy; // No entropy is needed for decrypt
+		entropy.resize(0);
+		std::string keystore_alias = mKey_Prefix;
+		keystore_alias += keystore_alias_subid;
+		String16 keystore_alias16(keystore_alias.c_str());
+#ifdef USE_KEYSTORAGE_4
+		android::hardware::keymaster::V4_0::KeyPurpose purpose = android::hardware::keymaster::V4_0::KeyPurpose::DECRYPT;
+		security::keymaster::OperationResult begin_result;
+		security::keymaster::OperationResult update_result;
+		security::keymaster::OperationResult finish_result;
+		::android::security::keymaster::KeymasterArguments empty_params;
+		// These parameters are mostly driven by the cipher.init call https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#63
+		service->begin(binder, keystore_alias16, (int32_t)purpose, true, android::security::keymaster::KeymasterArguments(begin_params.hidl_data()), entropy, -1, &begin_result);
+#else
+		::keystore::KeyPurpose purpose = ::keystore::KeyPurpose::DECRYPT;
+		OperationResult begin_result;
+		OperationResult update_result;
+		OperationResult finish_result;
+		::keystore::hidl_vec<::keystore::KeyParameter> empty_params;
+		empty_params.resize(0);
+		// These parameters are mostly driven by the cipher.init call https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#63
+		service->begin(binder, keystore_alias16, purpose, true, begin_params.hidl_data(), entropy, -1, &begin_result);
+#endif
+		ret = begin_result.resultCode;
+		if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
+			printf("keystore begin error: (%d)\n", /*responses[ret],*/ ret);
+			return disk_decryption_secret_key;
+		} else {
+			//printf("keystore begin operation successful\n");
+		}
+		// The cipher.doFinal call triggers an update to the keystore followed by a finish https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#64
+		// See also https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/KeyStoreCryptoOperationChunkedStreamer.java#208
+		service->update(begin_result.token, empty_params, intermediate_key, &update_result);
+		ret = update_result.resultCode;
+		if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
+			printf("keystore update error: (%d)\n", /*responses[ret],*/ ret);
+			return disk_decryption_secret_key;
+		} else {
+			//printf("keystore update operation successful\n");
+			//printf("keystore update returned: "); output_hex(&update_result.data[0], update_result.data.size()); printf("\n"); // this ends up being the synthetic password
+		}
+		// We must use the data in update_data.data before we call finish below or the data will be gone
+		// The payload data from the keystore update is further personalized at https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java#153
+		// We now have the disk decryption key!
+		disk_decryption_secret_key = PersonalizedHash(PERSONALIZATION_FBE_KEY, (const char*)&update_result.data[0], update_result.data.size());
+		//printf("disk_decryption_secret_key: '%s'\n", disk_decryption_secret_key.c_str());
+		::keystore::hidl_vec<uint8_t> signature;
+		service->finish(begin_result.token, empty_params, signature, entropy, &finish_result);
+		ret = finish_result.resultCode;
+		if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
+			printf("keystore finish error: (%d)\n", /*responses[ret],*/ ret);
+			return disk_decryption_secret_key;
+		} else {
+			//printf("keystore finish operation successful\n");
+		}
+		stop_keystore();
+		return disk_decryption_secret_key;
+	} else if (*synthetic_password_version == SYNTHETIC_PASSWORD_VERSION) {
+		printf("spblob v2\n");
+		/* Version 2 of the spblob is basically the same as version 1, but the order of getting the intermediate key and disk decryption key have been flip-flopped
+		 * as seen in https://android.googlesource.com/platform/frameworks/base/+/5025791ac6d1538224e19189397de8d71dcb1a12
+		 */
+		/* First decrypt call found in
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.1.0_r18/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#135
+		 * We will use https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreCipherSpiBase.java
+		 * and https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java
+		 * First we set some algorithm parameters as seen in two places:
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java#297
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java#216 */
+		// When using secdis (aka not weaver) you must supply an auth token to the keystore prior to the begin operation
+		if (auth_token_len > 0) {
+			/*::keystore::KeyStoreServiceReturnCode auth_result = service->addAuthToken(auth_token, auth_token_len);
+			if (!auth_result.isOk()) {
+				// The keystore checks the uid of the calling process and will return a permission denied on this operation for user 0
+				printf("keystore error adding auth token\n");
+				return disk_decryption_secret_key;
+			}*/
+			// The keystore refuses to allow the root user to supply auth tokens, so we write the auth token to a file earlier and
+			// run a separate service that runs user the system user to add the auth token. We wait for the auth token file to be
+			// deleted by the keymaster_auth service and check for a /auth_error file in case of errors. We quit after after a while if
+			// the /auth_token file never gets deleted.
+			int auth_wait_count = 20;
+			while (access("/auth_token", F_OK) == 0 && auth_wait_count-- > 0)
+				usleep(5000);
+			if (auth_wait_count == 0 || access("/auth_error", F_OK) == 0) {
+				printf("error during keymaster_auth service\n");
+				/* If you are getting this error, make sure that you have the keymaster_auth service defined in your init scripts, preferrably in init.recovery.{ro.hardware}.rc
+				 * service keystore_auth /sbin/keystore_auth
+				 *     disabled
+				 *     oneshot
+				 *     user system
+				 *     group root
+				 *     seclabel u:r:recovery:s0
+				 *
+				 * And check dmesg for error codes regarding this service if needed. */
+				return disk_decryption_secret_key;
+			}
+		}
+		int32_t ret;
+		size_t maclen = 128;
+		unsigned char* iv = (unsigned char*)byteptr; // The IV is the first 12 bytes of the spblob
+		::keystore::hidl_vec<uint8_t> iv_hidlvec;
+		iv_hidlvec.setToExternal((unsigned char*)byteptr, 12);
+		//printf("iv: "); output_hex((const unsigned char*)iv, 12); printf("\n");
+		unsigned char* cipher_text = (unsigned char*)byteptr + 12; // The cipher text comes immediately after the IV
+		::keystore::hidl_vec<uint8_t> cipher_text_hidlvec;
+		cipher_text_hidlvec.setToExternal(cipher_text, spblob_data.size() - 14 /* 1 each for version and SYNTHETIC_PASSWORD_PASSWORD_BASED and 12 for the iv */);
+		::keystore::AuthorizationSetBuilder begin_params;
+		begin_params.Authorization(::keystore::TAG_ALGORITHM, ::keystore::Algorithm::AES);
+		begin_params.Authorization(::keystore::TAG_BLOCK_MODE, ::keystore::BlockMode::GCM);
+		begin_params.Padding(::keystore::PaddingMode::NONE);
+		begin_params.Authorization(::keystore::TAG_NONCE, iv_hidlvec);
+		begin_params.Authorization(::keystore::TAG_MAC_LENGTH, maclen);
+		::keystore::hidl_vec<uint8_t> entropy; // No entropy is needed for decrypt
+		entropy.resize(0);
+		std::string keystore_alias = mKey_Prefix;
+		keystore_alias += keystore_alias_subid;
+		String16 keystore_alias16(keystore_alias.c_str());
+#ifdef USE_KEYSTORAGE_4
+		android::hardware::keymaster::V4_0::KeyPurpose purpose = android::hardware::keymaster::V4_0::KeyPurpose::DECRYPT;
+		security::keymaster::OperationResult begin_result;
+		security::keymaster::OperationResult update_result;
+		security::keymaster::OperationResult finish_result;
+		::android::security::keymaster::KeymasterArguments empty_params;
+		// These parameters are mostly driven by the cipher.init call https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#63
+		service->begin(binder, keystore_alias16, (int32_t)purpose, true, android::security::keymaster::KeymasterArguments(begin_params.hidl_data()), entropy, -1, &begin_result);
+#else
+		::keystore::KeyPurpose purpose = ::keystore::KeyPurpose::DECRYPT;
+		OperationResult begin_result;
+		OperationResult update_result;
+		OperationResult finish_result;
+		::keystore::hidl_vec<::keystore::KeyParameter> empty_params;
+		empty_params.resize(0);
+		// These parameters are mostly driven by the cipher.init call https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#63
+		service->begin(binder, keystore_alias16, purpose, true, begin_params.hidl_data(), entropy, -1, &begin_result);
+#endif
+		ret = begin_result.resultCode;
+		if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
+			printf("keystore begin error: (%d)\n", /*responses[ret],*/ ret);
+			return disk_decryption_secret_key;
+		} /*else {
+			printf("keystore begin operation successful\n");
+		}*/
+		// The cipher.doFinal call triggers an update to the keystore followed by a finish https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#64
+		// See also https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/KeyStoreCryptoOperationChunkedStreamer.java#208
+		service->update(begin_result.token, empty_params, cipher_text_hidlvec, &update_result);
+		ret = update_result.resultCode;
+		if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
+			printf("keystore update error: (%d)\n", /*responses[ret],*/ ret);
+			return disk_decryption_secret_key;
+		} /*else {
+			printf("keystore update operation successful\n");
+			printf("keystore update returned: "); output_hex(&update_result.data[0], update_result.data.size()); printf("\n"); // this ends up being the synthetic password
+		}*/
+		//printf("keystore resulting data: "); output_hex((unsigned char*)&update_result.data[0], update_result.data.size()); printf("\n");
+		// We must copy the data in update_data.data before we call finish below or the data will be gone
+		size_t keystore_result_size = update_result.data.size();
+		unsigned char* keystore_result = (unsigned char*)malloc(keystore_result_size);
+		if (!keystore_result) {
+			printf("malloc on keystore_result\n");
+			return disk_decryption_secret_key;
+		}
+		memcpy(keystore_result, &update_result.data[0], update_result.data.size());
+		//printf("keystore_result data: "); output_hex(keystore_result, keystore_result_size); printf("\n");
+		::keystore::hidl_vec<uint8_t> signature;
+		service->finish(begin_result.token, empty_params, signature, entropy, &finish_result);
+		ret = finish_result.resultCode;
+		if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
+			printf("keystore finish error: (%d)\n", /*responses[ret],*/ ret);
+			free(keystore_result);
+			return disk_decryption_secret_key;
+		} /*else {
+			printf("keystore finish operation successful\n");
+		}*/
+		stop_keystore();
+
+		/* Now we do the second decrypt call as seen in:
+		 * https://android.googlesource.com/platform/frameworks/base/+/android-8.1.0_r18/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#136
+		 */
+		const unsigned char* intermediate_iv = keystore_result;
+		//printf("intermediate_iv: "); output_hex((const unsigned char*)intermediate_iv, 12); printf("\n");
+		const unsigned char* intermediate_cipher_text = (const unsigned char*)keystore_result + 12; // The cipher text comes immediately after the IV
+		int cipher_size = keystore_result_size - 12;
+		//printf("intermediate_cipher_text: "); output_hex((const unsigned char*)intermediate_cipher_text, cipher_size); printf("\n");
+		// First we personalize as seen https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#102
+		void* personalized_application_id = PersonalizedHashBinary(PERSONALISATION_APPLICATION_ID, (const char*)application_id, application_id_size);
+		if (!personalized_application_id) {
+			printf("malloc personalized_application_id\n");
+			free(keystore_result);
+			return disk_decryption_secret_key;
+		}
+		//printf("personalized application id: "); output_hex((unsigned char*)personalized_application_id, SHA512_DIGEST_LENGTH); printf("\n");
+		// Now we'll decrypt using openssl AES/GCM/NoPadding
+		OpenSSL_add_all_ciphers();
+		int actual_size=0, final_size=0;
+		EVP_CIPHER_CTX *d_ctx = EVP_CIPHER_CTX_new();
+		const unsigned char* key = (const unsigned char*)personalized_application_id; // The key is the now personalized copy of the application ID
+		//printf("key: "); output_hex((const unsigned char*)key, 32); printf("\n");
+		EVP_DecryptInit(d_ctx, EVP_aes_256_gcm(), key, intermediate_iv);
+		unsigned char* secret_key = (unsigned char*)malloc(cipher_size);
+		EVP_DecryptUpdate(d_ctx, secret_key, &actual_size, intermediate_cipher_text, cipher_size);
+		unsigned char tag[AES_BLOCK_SIZE];
+		EVP_CIPHER_CTX_ctrl(d_ctx, EVP_CTRL_GCM_SET_TAG, 16, tag);
+		EVP_DecryptFinal_ex(d_ctx, secret_key + actual_size, &final_size);
+		EVP_CIPHER_CTX_free(d_ctx);
+		free(personalized_application_id);
+		free(keystore_result);
+		int secret_key_real_size = actual_size - 16;
+		//printf("secret key:  "); output_hex((const unsigned char*)secret_key, secret_key_real_size); printf("\n");
+		// The payload data from the keystore update is further personalized at https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java#153
+		// We now have the disk decryption key!
+		disk_decryption_secret_key = PersonalizedHash(PERSONALIZATION_FBE_KEY, (const char*)secret_key, secret_key_real_size);
+		//printf("disk_decryption_secret_key: '%s'\n", disk_decryption_secret_key.c_str());
+		free(secret_key);
+		return disk_decryption_secret_key;
 	}
-
-	int32_t ret;
-
-	/* We only need a keyAlias which is USRSKEY_synthetic_password_b6f71045af7bd042 which we find and a uid which is -1 or 1000, I forget which
-	 * as the key data will be read again by the begin function later via the keystore.
-	 * The data is in a hidl_vec format which consists of a type and a value. */
-	/*::keystore::hidl_vec<uint8_t> data;
-	std::string keystoreid = SYNTHETIC_PASSWORD_KEY_PREFIX;
-	keystoreid += handle_str;
-
-	ret = service->get(String16(keystoreid.c_str()), user_id, &data);
-	if (ret < 0) {
-		printf("Could not connect to keystore service %i\n", ret);
-		return disk_decryption_secret_key;
-	} else if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*//*) {
-		printf("keystore error: (%d)\n", /*responses[ret],*//* ret);
-		return disk_decryption_secret_key;
-	} else {
-		printf("keystore returned: "); output_hex(&data[0], data.size()); printf("\n");
-	}*/
-
-	// Now we'll break up the intermediate key into the IV (first 12 bytes) and the cipher text (the rest of it).
-	std::vector<unsigned char> nonce = intermediate_key;
-	nonce.resize(12);
-	intermediate_key.erase (intermediate_key.begin(),intermediate_key.begin()+12);
-	//printf("nonce: "); output_hex((const unsigned char*)nonce.data(), nonce.size()); printf("\n");
-	//printf("cipher text: "); output_hex((const unsigned char*)intermediate_key.data(), intermediate_key.size()); printf("\n");
-
-	/* Now we will begin the second decrypt call found in
-	 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#122
-	 * This time we will use https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreCipherSpiBase.java
-	 * and https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java
-	 * First we set some algorithm parameters as seen in two places:
-	 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java#297
-	 * https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/AndroidKeyStoreAuthenticatedAESCipherSpi.java#216 */
-	size_t maclen = 128;
-	::keystore::AuthorizationSetBuilder begin_params;
-	begin_params.Authorization(::keystore::TAG_ALGORITHM, ::keystore::Algorithm::AES);
-	begin_params.Authorization(::keystore::TAG_BLOCK_MODE, ::keystore::BlockMode::GCM);
-    begin_params.Padding(::keystore::PaddingMode::NONE);
-    begin_params.Authorization(::keystore::TAG_NONCE, nonce);
-    begin_params.Authorization(::keystore::TAG_MAC_LENGTH, maclen);
-	//keymasterArgs.addEnum(KeymasterDefs.KM_TAG_ALGORITHM, KeymasterDefs.KM_ALGORITHM_AES);
-	//keymasterArgs.addEnum(KeymasterDefs.KM_TAG_BLOCK_MODE, mKeymasterBlockMode);
-	//keymasterArgs.addEnum(KeymasterDefs.KM_TAG_PADDING, mKeymasterPadding);
-	//keymasterArgs.addUnsignedInt(KeymasterDefs.KM_TAG_MAC_LENGTH, mTagLengthBits);
-	::keystore::hidl_vec<uint8_t> entropy; // No entropy is needed for decrypt
-	entropy.resize(0);
-	std::string keystore_alias = SYNTHETIC_PASSWORD_KEY_PREFIX;
-	keystore_alias += keystore_alias_subid;
-	String16 keystore_alias16(keystore_alias.c_str());
-	::keystore::KeyPurpose purpose = ::keystore::KeyPurpose::DECRYPT;
-	OperationResult begin_result;
-	// These parameters are mostly driven by the cipher.init call https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#63
-	service->begin(binder, keystore_alias16, purpose, true, begin_params.hidl_data(), entropy, -1, &begin_result);
-	ret = begin_result.resultCode;
-	if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
-		printf("keystore begin error: (%d)\n", /*responses[ret],*/ ret);
-		return disk_decryption_secret_key;
-	} else {
-		//printf("keystore begin operation successful\n");
-	}
-	::keystore::hidl_vec<::keystore::KeyParameter> empty_params;
-	empty_params.resize(0);
-	OperationResult update_result;
-	// The cipher.doFinal call triggers an update to the keystore followed by a finish https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordCrypto.java#64
-	// See also https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/keystore/java/android/security/keystore/KeyStoreCryptoOperationChunkedStreamer.java#208
-	service->update(begin_result.token, empty_params, intermediate_key, &update_result);
-	ret = update_result.resultCode;
-	if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
-		printf("keystore update error: (%d)\n", /*responses[ret],*/ ret);
-		return disk_decryption_secret_key;
-	} else {
-		//printf("keystore update operation successful\n");
-		//printf("keystore update returned: "); output_hex(&update_result.data[0], update_result.data.size()); printf("\n"); // this ends up being the synthetic password
-	}
-	// We must use the data in update_data.data before we call finish below or the data will be gone
-	// The payload data from the keystore update is further personalized at https://android.googlesource.com/platform/frameworks/base/+/android-8.0.0_r23/services/core/java/com/android/server/locksettings/SyntheticPasswordManager.java#153
-	// We now have the disk decryption key!
-	disk_decryption_secret_key = PersonalizedHash(PERSONALIZATION_FBE_KEY, (const char*)&update_result.data[0], update_result.data.size());
-	//printf("disk_decryption_secret_key: '%s'\n", disk_decryption_secret_key.c_str());
-	::keystore::hidl_vec<uint8_t> signature;
-	OperationResult finish_result;
-	service->finish(begin_result.token, empty_params, signature, entropy, &finish_result);
-	ret = finish_result.resultCode;
-	if (ret != 1 /*android::keystore::ResponseCode::NO_ERROR*/) {
-		printf("keystore finish error: (%d)\n", /*responses[ret],*/ ret);
-		return disk_decryption_secret_key;
-	} else {
-		//printf("keystore finish operation successful\n");
-	}
-	stop_keystore();
 	return disk_decryption_secret_key;
 }
 
@@ -949,7 +1158,11 @@ bool Decrypt_User_Synth_Pass(const userid_t user_id, const std::string& Password
 		printf("e4crypt_unlock_user_key returned fail\n");
 		return Free_Return(retval, weaver_key, &pwd);
 	}
+#ifdef USE_KEYSTORAGE_4
+	if (!e4crypt_prepare_user_storage("", user_id, 0, flags)) {
+#else
 	if (!e4crypt_prepare_user_storage(nullptr, user_id, 0, flags)) {
+#endif
 		printf("failed to e4crypt_prepare_user_storage\n");
 		return Free_Return(retval, weaver_key, &pwd);
 	}
@@ -1035,7 +1248,11 @@ bool Decrypt_User(const userid_t user_id, const std::string& Password) {
 			printf("e4crypt_unlock_user_key returned fail\n");
 			return false;
 		}
+#ifdef USE_KEYSTORAGE_4
+		if (!e4crypt_prepare_user_storage("", user_id, 0, flags)) {
+#else
 		if (!e4crypt_prepare_user_storage(nullptr, user_id, 0, flags)) {
+#endif
 			printf("failed to e4crypt_prepare_user_storage\n");
 			return false;
 		}

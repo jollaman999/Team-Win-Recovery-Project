@@ -146,6 +146,16 @@ void DataManager::get_device_id(void) {
 #endif
 
 #ifndef TW_FORCE_CPUINFO_FOR_DEVICE_ID
+#ifdef TW_USE_SERIALNO_PROPERTY_FOR_DEVICE_ID
+	// Check serial number system property
+	if (property_get("ro.serialno", line, "")) {
+		snprintf(device_id, DEVID_MAX, "%s", line);
+		sanitize_device_id(device_id);
+		mConst.SetValue("device_id", device_id);
+		return;
+	}
+#endif
+
 	// Check the cmdline to see if the serial number was supplied
 	fp = fopen("/proc/cmdline", "rt");
 	if (fp != NULL) {
@@ -757,10 +767,10 @@ void DataManager::SetDefaultValues()
 	mPersist.SetValue("tw_military_time", "0");
 
 #ifdef TW_INCLUDE_CRYPTO
-	mConst.SetValue(TW_USE_SHA2, "1");
-	mConst.SetValue(TW_NO_SHA2, "0");
+	mPersist.SetValue(TW_USE_SHA2, "1");
+	mPersist.SetValue(TW_NO_SHA2, "0");
 #else
-	mConst.SetValue(TW_NO_SHA2, "1");
+	mPersist.SetValue(TW_NO_SHA2, "1");
 #endif
 
 #ifdef TW_NO_SCREEN_TIMEOUT

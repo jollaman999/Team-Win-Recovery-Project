@@ -769,7 +769,6 @@ int TWPartitionManager::Cancel_Backup() {
 int TWPartitionManager::Run_Backup(bool adbbackup) {
 	PartitionSettings part_settings;
 	int partition_count = 0, disable_free_space_check = 0, skip_digest = 0;
-	int gui_adb_backup;
 	string Backup_Name, Backup_List, backup_path;
 	unsigned long long total_bytes = 0, free_space = 0;
 	TWPartition* storage = NULL;
@@ -1120,7 +1119,7 @@ int TWPartitionManager::Run_Restore(const string& Restore_Name) {
 		}
 	}
 	TWFunc::GUI_Operation_Text(TW_UPDATE_SYSTEM_DETAILS_TEXT, gui_parse_text("{@updating_system_details}"));
-	UnMount_By_Path("/system", false);
+	UnMount_By_Path(Get_Android_Root_Path(), false);
 	Update_System_Details();
 	UnMount_Main_Partitions();
 	time(&rStop);
@@ -1506,7 +1505,7 @@ void TWPartitionManager::Update_System_Details(void) {
 	for (iter = Partitions.begin(); iter != Partitions.end(); iter++) {
 		(*iter)->Update_Size(true);
 		if ((*iter)->Can_Be_Mounted) {
-			if ((*iter)->Mount_Point == "/system") {
+			if ((*iter)->Mount_Point == Get_Android_Root_Path()) {
 				int backup_display_size = (int)((*iter)->Backup_Size / 1048576LLU);
 				DataManager::SetValue(TW_BACKUP_SYSTEM_SIZE, backup_display_size);
 			} else if ((*iter)->Mount_Point == "/data" || (*iter)->Mount_Point == "/datadata") {
@@ -1623,6 +1622,7 @@ int TWPartitionManager::Decrypt_Device(string Password) {
 			(*iter)->Mount(true);
 		}
 	}
+	property_set("twrp.mount_to_decrypt", "1");
 
 	property_get("ro.crypto.state", crypto_state, "error");
 	if (strcmp(crypto_state, "error") == 0) {
@@ -1692,6 +1692,7 @@ int TWPartitionManager::Decrypt_Device(string Password) {
 			(*iter)->UnMount(false);
 		}
 	}
+	property_set("twrp.mount_to_decrypt", "0");
 
 	if (pwret != 0) {
 		gui_err("fail_decrypt=Failed to decrypt data.");
@@ -1877,7 +1878,7 @@ void TWPartitionManager::UnMount_Main_Partitions(void) {
 
 	TWPartition* Boot_Partition = Find_Partition_By_Path("/boot");
 
-	UnMount_By_Path("/system", true);
+	UnMount_By_Path(Get_Android_Root_Path(), true);
 	if (!datamedia)
 		UnMount_By_Path("/data", true);
 
@@ -2937,6 +2938,13 @@ string TWPartitionManager::Get_Active_Slot_Suffix() {
 }
 string TWPartitionManager::Get_Active_Slot_Display() {
 	return Active_Slot_Display;
+}
+
+string TWPartitionManager::Get_Android_Root_Path() {
+	std::string Android_Root = getenv("ANDROID_ROOT");
+	if (Android_Root == "")
+		Android_Root = "/system";
+	return Android_Root;
 }
 
 void TWPartitionManager::Remove_Uevent_Devices(const string& Mount_Point) {

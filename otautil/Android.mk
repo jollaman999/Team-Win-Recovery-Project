@@ -25,9 +25,17 @@ LOCAL_STATIC_LIBRARIES := \
     libselinux \
     libbase
 
+ifeq ($(shell test $(PLATFORM_SDK_VERSION) -gt 26; echo $$?),0)
+# Android 8.1 header
+LOCAL_C_INCLUDES += \
+    system/core/libziparchive/include
+endif
+
 LOCAL_MODULE := libotautil
 LOCAL_CFLAGS := \
     -Werror \
     -Wall
+
+LOCAL_C_INCLUDES := include
 
 include $(BUILD_STATIC_LIBRARY)

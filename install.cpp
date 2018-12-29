@@ -49,9 +49,9 @@
 #include <ziparchive/zip_archive.h>
 
 #include "common.h"
-#include "error_code.h"
 #include "otautil/SysUtil.h"
 #include "otautil/ThermalUtil.h"
+#include "otautil/error_code.h"
 #include "private/install.h"
 #include "roots.h"
 #include "ui.h"
@@ -148,13 +148,23 @@ static int check_newer_ab_build(ZipArchiveHandle zip) {
     return INSTALL_ERROR;
   }
 
-  // We allow the package to not have any serialno, but if it has a non-empty
-  // value it should match.
+  // We allow the package to not have any serialno; and we also allow it to carry multiple serial
+  // numbers split by "|"; e.g. serialno=serialno1|serialno2|serialno3 ... We will fail the
+  // verification if the device's serialno doesn't match any of these carried numbers.
   value = android::base::GetProperty("ro.serialno", "");
   const std::string& pkg_serial_no = metadata["serialno"];
-  if (!pkg_serial_no.empty() && pkg_serial_no != value) {
-    LOG(ERROR) << "Package is for serial " << pkg_serial_no;
-    return INSTALL_ERROR;
+  if (!pkg_serial_no.empty()) {
+    bool match = false;
+    for (const std::string& number : android::base::Split(pkg_serial_no, "|")) {
+      if (value == android::base::Trim(number)) {
+        match = true;
+        break;
+      }
+    }
+    if (!match) {
+      LOG(ERROR) << "Package is for serial " << pkg_serial_no;
+      return INSTALL_ERROR;
+    }
   }
 
   if (metadata["ota-type"] != "AB") {
@@ -176,28 +186,6 @@ static int check_newer_ab_build(ZipArchiveHandle zip) {
     LOG(ERROR) << "Package is for source build " << pkg_pre_build_fingerprint << " but expected "
                << value;
     return INSTALL_ERROR;
-  }
-
-  // Check for downgrade version.
-  int64_t build_timestamp =
-      android::base::GetIntProperty("ro.build.date.utc", std::numeric_limits<int64_t>::max());
-  int64_t pkg_post_timestamp = 0;
-  // We allow to full update to the same version we are running, in case there
-  // is a problem with the current copy of that version.
-  if (metadata["post-timestamp"].empty() ||
-      !android::base::ParseInt(metadata["post-timestamp"].c_str(), &pkg_post_timestamp) ||
-      pkg_post_timestamp < build_timestamp) {
-    if (metadata["ota-downgrade"] != "yes") {
-      LOG(ERROR) << "Update package is older than the current build, expected a build "
-                    "newer than timestamp "
-                 << build_timestamp << " but package has timestamp " << pkg_post_timestamp
-                 << " and downgrade not allowed.";
-      return INSTALL_ERROR;
-    }
-    if (pkg_pre_build_fingerprint.empty()) {
-      LOG(ERROR) << "Downgrade package must have a pre-build version set, not allowed.";
-      return INSTALL_ERROR;
-    }
   }
 
   return 0;
@@ -280,7 +268,7 @@ int update_binary_command(const std::string& package, ZipArchiveHandle zip,
 
   *cmd = {
     binary_path,
-    EXPAND(RECOVERY_API_VERSION),  // defined in Android.mk
+    std::to_string(kRecoveryApiVersion),
     std::to_string(status_fd),
     package,
   };
@@ -321,6 +309,7 @@ static int try_update_binary(const std::string& package, ZipArchiveHandle zip, b
   if (ret) {
     close(pipefd[0]);
     close(pipefd[1]);
+    log_buffer->push_back(android::base::StringPrintf("error: %d", kUpdateBinaryCommandFailure));
     return ret;
   }
 
@@ -385,6 +374,7 @@ static int try_update_binary(const std::string& package, ZipArchiveHandle zip, b
     close(pipefd[0]);
     close(pipefd[1]);
     PLOG(ERROR) << "Failed to fork update binary";
+    log_buffer->push_back(android::base::StringPrintf("error: %d", kForkUpdateBinaryFailure));
     return INSTALL_ERROR;
   }
 
@@ -573,6 +563,7 @@ static int really_install_package(const std::string& path, bool* wipe_cache, boo
   MemMapping map;
   if (!map.MapFile(path)) {
     LOG(ERROR) << "failed to map file";
+    log_buffer->push_back(android::base::StringPrintf("error: %d", kMapFileFailure));
     return INSTALL_CORRUPT;
   }
 
@@ -640,7 +631,7 @@ int install_package(const std::string& path, bool* wipe_cache, const std::string
   std::chrono::duration<double> duration = std::chrono::system_clock::now() - start;
   int time_total = static_cast<int>(duration.count());
 
-  bool has_cache = volume_for_path("/cache") != nullptr;
+  bool has_cache = volume_for_mount_point("/cache") != nullptr;
   // Skip logging the uncrypt_status on devices without /cache.
   if (has_cache) {
     static constexpr const char* UNCRYPT_STATUS = "/cache/recovery/uncrypt_status";
